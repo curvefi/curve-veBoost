@@ -20,3 +20,9 @@ event Transfer:
     _from: indexed(address)
     _to: indexed(address)
     _tokenId: indexed(uint256)
+
+
+balanceOf: public(HashMap[address, uint256])
+getApproved: public(HashMap[uint256, address])
+isApprovedForAll: public(HashMap[address, HashMap[address, bool]])
+ownerOf: public(HashMap[uint256, address])

@@ -67,6 +67,29 @@ def _is_approved_or_owner(_spender: address, _token_id: uint256) -> bool:
     )
 
 
+@internal
+def _burn(_token_id: uint256):
+    owner: address = self.ownerOf[_token_id]
+
+    self._approve(owner, ZERO_ADDRESS, _token_id)
+
+    self.balanceOf[owner] -= 1
+    self.ownerOf[_token_id] = ZERO_ADDRESS
+
+    log Transfer(owner, ZERO_ADDRESS, _token_id)
+
+
+@internal
+def _mint(_to: address, _token_id: uint256):
+    assert _to != ZERO_ADDRESS  # dev: minting to ZERO_ADDRESS disallowed
+    assert self.ownerOf[_token_id] == ZERO_ADDRESS  # dev: token exists
+
+    self.balanceOf[_to] += 1
+    self.ownerOf[_token_id] = _to
+
+    log Transfer(ZERO_ADDRESS, _to, _token_id)
+
+
 @external
 def approve(_approved: address, _token_id: uint256):
     """

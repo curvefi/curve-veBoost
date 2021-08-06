@@ -3,6 +3,7 @@
 @title Voting Escrow Delegation
 @author Curve Finance
 @license MIT
+@dev Provides test functions only available in test mode (`brownie test`)
 """
 
 
@@ -149,3 +150,15 @@ def transferFrom(_from: address, _to: address, _token_id: uint256):
     """
     assert self._is_approved_or_owner(msg.sender, _token_id)
     self._transfer(_from, _to, _token_id)
+
+#@ if is_test:
+
+@external
+def _mint_for_testing(_to: address, _token_id: uint256):
+    self._mint(_to, _token_id)
+
+@external
+def _burn_for_testing(_token_id: uint256):
+    self._burn(_token_id)
+
+#@ endif

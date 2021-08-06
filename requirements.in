@@ -2,5 +2,6 @@ black
 eth-brownie
 flake8
 isort
+Jinja2
 pip-tools
 pre-commit

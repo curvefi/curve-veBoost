@@ -168,6 +168,8 @@ ipfshttpclient==0.7.0
     #   web3
 isort==5.9.3
     # via -r requirements.in
+jinja2==3.0.1
+    # via -r requirements.in
 jsonschema==3.2.0
     # via
     #   eth-brownie
@@ -179,6 +181,8 @@ lru-dict==1.1.7
     # via
     #   eth-brownie
     #   web3
+markupsafe==2.0.1
+    # via jinja2
 mccabe==0.6.1
     # via flake8
 multiaddr==0.0.9

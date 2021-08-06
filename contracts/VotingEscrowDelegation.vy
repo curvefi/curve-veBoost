@@ -110,7 +110,7 @@ def approve(_approved: address, _token_id: uint256):
 
 @external
 def safeTransferFrom(_from: address, _to: address, _token_id: uint256, _data: Bytes[4096] = b""):
-    assert self._is_approved_or_owner(msg.sender, _token_id)
+    assert self._is_approved_or_owner(msg.sender, _token_id)  # dev: neither owner nor approved
     self._transfer(_from, _to, _token_id)
 
     if _to.is_contract:

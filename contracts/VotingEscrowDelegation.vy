@@ -148,7 +148,7 @@ def transferFrom(_from: address, _to: address, _token_id: uint256):
     @param _to The new owner
     @param _token_id The NFT to transfer
     """
-    assert self._is_approved_or_owner(msg.sender, _token_id)
+    assert self._is_approved_or_owner(msg.sender, _token_id)  # dev: neither owner nor approved
     self._transfer(_from, _to, _token_id)
 
 #@ if is_test:

@@ -10,7 +10,7 @@
 interface ERC721Receiver:
     def onERC721Received(
         _operator: address, _from: address, _token_id: uint256, _data: Bytes[4096]
-    ) -> Bytes[4]:
+    ) -> bytes32:
         nonpayable
 
 
@@ -114,10 +114,10 @@ def safeTransferFrom(_from: address, _to: address, _token_id: uint256, _data: By
     self._transfer(_from, _to, _token_id)
 
     if _to.is_contract:
-        response: Bytes[4] = ERC721Receiver(_to).onERC721Received(
+        response: bytes32 = ERC721Receiver(_to).onERC721Received(
             msg.sender, _from, _token_id, _data
         )
-        assert response == method_id(
+        assert slice(response, 0, 4) == method_id(
             "onERC721Received(address,address,uint256,bytes)"
         )  # dev: invalid response
 

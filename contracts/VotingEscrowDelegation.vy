@@ -35,6 +35,17 @@ getApproved: public(HashMap[uint256, address])
 isApprovedForAll: public(HashMap[address, HashMap[address, bool]])
 ownerOf: public(HashMap[uint256, address])
 
+name: public(String[32])
+symbol: public(String[32])
+tokenURI: public(String[2])
+
+
+@external
+def __init__(_name: String[32], _symbol: String[32], _base_uri: String[128]):
+    self.name = _name
+    self.symbol = _symbol
+    self.tokenURI = ""
+
 
 @internal
 def _approve(_owner: address, _approved: address, _token_id: uint256):

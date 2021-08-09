@@ -30,6 +30,12 @@ event Transfer:
     _token_id: indexed(uint256)
 
 
+struct Boost:
+    # [bias int128][slope int128]
+    delegated: uint256
+    received: uint256
+
+
 balanceOf: public(HashMap[address, uint256])
 getApproved: public(HashMap[uint256, address])
 isApprovedForAll: public(HashMap[address, HashMap[address, bool]])
@@ -37,6 +43,8 @@ ownerOf: public(HashMap[uint256, address])
 
 name: public(String[32])
 symbol: public(String[32])
+
+boost: HashMap[address, Boost]
 
 
 @external

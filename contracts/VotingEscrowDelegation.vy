@@ -345,7 +345,7 @@ def create_boost(
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
     assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
 
-    # timstamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
+    # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(_delegator)
 
     assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
@@ -406,7 +406,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
     assert _percentage > 0  # dev: percentage must be greater than 0 bps
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
 
-    # timstamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
+    # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(delegator)
 
     assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
@@ -538,6 +538,39 @@ def adjusted_balance_of(_account: address) -> uint256:
     # when delegating boost, received boost isn't used for determining how
     # much we can delegate.
     return convert(max(adjusted_balance, empty(int256)), uint256)
+
+
+@view
+@external
+def delegated_boost(_account: address) -> uint256:
+    """
+    @notice Query the total effective delegated boost value of an account.
+    @dev This value can be greater than the veCRV balance of
+        an account if the account has outstanding negative
+        value boosts.
+    @param _account The account to query
+    """
+    dslope: int256 = 0
+    dbias: int256 = 0
+    dbias, dslope = self._deconstruct_bias_slope(self.boost[_account].delegated)
+    time: int256 = convert(block.timestamp, int256)
+    return convert(abs(dslope * time + dbias), uint256)
+
+
+@view
+@external
+def received_boost(_account: address) -> uint256:
+    """
+    @notice Query the total effective received boost value of an account
+    @dev This value can be 0, even with delegations which have a large value,
+        if the account has any outstanding negative value boosts.
+    @param _account The account to query
+    """
+    rslope: int256 = 0
+    rbias: int256 = 0
+    rbias, rslope = self._deconstruct_bias_slope(self.boost[_account].received)
+    time: int256 = convert(block.timestamp, int256)
+    return convert(max(rslope * time + rbias, empty(int256)), uint256)
 
 
 @external

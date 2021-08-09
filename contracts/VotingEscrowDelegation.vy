@@ -250,7 +250,7 @@ def tokenURI(_token_id: uint256) -> String[2]:
 
 
 @external
-def delegate_boost(
+def create_boost(
     _delegator: address,
     _receiver: address,
     _percentage: int256,

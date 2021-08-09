@@ -348,7 +348,7 @@ def create_boost(
     # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(_delegator)
 
-    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
+    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast MIN_DELEGATION_TIME
     assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
     assert _id < 2 ** 56  # dev: id out of bounds
 

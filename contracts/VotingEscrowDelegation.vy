@@ -269,6 +269,32 @@ def transferFrom(_from: address, _to: address, _token_id: uint256):
 def tokenURI(_token_id: uint256) -> String[2]:
     return ""
 
+
+@external
+def burn(_token_id: uint256):
+    """
+    @notice Destroy a token
+    @dev Only callable by the token owner, their operator, or an approved account.
+        Burning a token with a currently active boost, burns the boost.
+    @param _token_id The token to burn
+    """
+    assert self._is_approved_or_owner(msg.sender, _token_id)  # dev: neither owner nor approved
+
+    tdata: uint256 = self.boost_token[_token_id]
+    if tdata != 0:
+        tslope: int256 = 0
+        tbias: int256 = 0
+        tbias, tslope = self._deconstruct_bias_slope(tdata)
+
+        delegator: address = convert(shift(_token_id, -96), address)
+        owner: address = self.ownerOf[_token_id]
+
+        self._burn_boost(_token_id, delegator, owner, tbias, tslope)
+
+        log BurnBoost(delegator, owner, _token_id)
+
+    self._burn(_token_id)
+
 #@ if is_test:
 
 @external

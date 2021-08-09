@@ -606,6 +606,22 @@ def token_boost(_token_id: uint256) -> int256:
     return tslope * time + tbias
 
 
+@view
+@external
+def token_expiry(_token_id: uint256) -> uint256:
+    """
+    @notice Query the timestamp of a boost token's expiry
+    @dev The effective value of a boost is negative after it's expiration
+        date.
+    @param _token_id The token id to query
+    """
+    tslope: int256 = 0
+    tbias: int256 = 0
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
+    # y = mx + b -> (y - b) / m = x -> (0 - b)/m = x
+    return convert(-tbias/tslope, uint256)
+
+
 @external
 def commit_transfer_ownership(_addr: address):
     """

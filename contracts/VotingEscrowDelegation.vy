@@ -573,6 +573,22 @@ def received_boost(_account: address) -> uint256:
     return convert(max(rslope * time + rbias, empty(int256)), uint256)
 
 
+@view
+@external
+def token_boost(_token_id: uint256) -> int256:
+    """
+    @notice Query the effective value of a boost
+    @dev The effective value of a boost is negative after it's expiration
+        date.
+    @param _token_id The token id to query
+    """
+    tslope: int256 = 0
+    tbias: int256 = 0
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    time: int256 = convert(block.timestamp, int256)
+    return tslope * time + tbias
+
+
 @external
 def commit_transfer_ownership(_addr: address):
     """

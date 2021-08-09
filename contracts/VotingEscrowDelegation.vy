@@ -368,3 +368,56 @@ def cancel_boost(_token_id: uint256):
             # All others are disallowed
             raise "Not allowed!"
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+
+
+@view
+@external
+def adjusted_balance_of(_account: address) -> uint256:
+    """
+    @notice Adjusted veCRV balance after accounting for delegations and boosts
+    @dev If boosts/delegations have a negative value, they're effective value is 0
+    @param _account The account to query the adjusted balance of
+    """
+    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_account), int256)
+    boost: Boost = self.boost[_account]
+    time: int256 = convert(block.timestamp, int256)
+
+    delegated_boost: int256 = 0
+    received_boost: int256 = 0
+
+    if boost.delegated != 0:
+        dslope: int256 = 0
+        dbias: int256 = 0
+        dbias, dslope = self._deconstruct_bias_slope(boost.delegated)
+
+        # we take the absolute value, since delegated boost can be negative
+        # if any outstanding negative boosts are in circulation
+        # this can inflate the vecrv balance of a user
+        # taking the absolute value has the effect that it costs
+        # a user to negatively impact another's vecrv balance
+        delegated_boost = abs(dslope * time + dbias)
+
+    if boost.received != 0:
+        rslope: int256 = 0
+        rbias: int256 = 0
+        rbias, rslope = self._deconstruct_bias_slope(boost.received)
+
+        # similar to delegated boost, our received boost can be negative
+        # if any outstanding negative boosts are in our possession
+        # However, unlike delegated boost, we do not negatively impact
+        # our adjusted balance due to negative boosts. Instead we take
+        # whichever is greater between 0 and the value of our received
+        # boosts.
+        received_boost = max(rslope * time + rbias, empty(int256))
+
+    # adjusted balance = vecrv_balance - abs(delegated_boost) + max(received_boost, 0)
+    adjusted_balance: int256 = vecrv_balance - delegated_boost + received_boost
+
+    # since we took the absolute value of our delegated boost, it now instead of
+    # becoming negative is positive, and will continue to increase ...
+    # meaning if we keep a negative outstanding delegated balance for long
+    # enought it will not only decrease our vecrv_balance but also our received
+    # boost, however we return the maximum between our adjusted balance and 0
+    # when delegating boost, received boost isn't used for determining how
+    # much we can delegate.
+    return convert(max(adjusted_balance, empty(int256)), uint256)

@@ -290,6 +290,21 @@ def create_boost(
     _expire_time: uint256,
     _id: uint256,
 ):
+    """
+    @notice Create a boost and delegate it to another account.
+    @dev Delegated boost can become negative, and requires active management, else
+        the adjusted veCRV balance of the delegator's account will decrease until reaching 0
+    @param _delegator The account to delegate boost from
+    @param _receiver The account to receive the delegated boost
+    @param _percentage Since veCRV is a constantly decreasing asset, we use percentage to determine
+        the amount of delegator's boost to delegate
+    @param _cancel_time A point in time before _expire_time in which the delegator or their operator
+        can cancel the delegated boost
+    @param _expire_time The point in time, atleast a day in the future, at which the value of the boost
+        will reach 0. After which the negative value is deducted from the delegator's account (and the
+        receiver's received boost only) until it is cancelled
+    @param _id The token id, within the range of [0, 2 ** 56)
+    """
     assert msg.sender == _delegator or self.isApprovedForAll[_delegator][msg.sender]  # dev: only delegator or operator
     assert _percentage > 0  # dev: percentage must be greater than 0 bps
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
@@ -336,6 +351,19 @@ def create_boost(
 
 @external
 def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256):
+    """
+    @notice Extend the boost of an existing boost or expired boost
+    @dev The extension can not decrease the value of the boost. If there are
+        any outstanding negative value boosts which cause the delegable boost
+        of an account to be negative this call will revert
+    @param _token_id The token to extend the boost of
+    @param _percentage The percentage of delegable boost to delegate
+        AFTER burning the token's current boost
+    @param _expire_time The new time at which the boost value will become
+        0, and eventually negative. Must be greater than the previous expiry time,
+        and atleast a day from now, and less than the veCRV lock expiry of the
+        delegator's account.
+    """
     delegator: address = convert(shift(_token_id, -96), address)
     receiver: address = self.ownerOf[_token_id]
 
@@ -357,6 +385,10 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
     tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
     tvalue: int256 = tslope * time + tbias
 
+    # assert the new expiry is ahead of the already existing expiry, otherwise
+    # this isn't really an extension
+    assert convert(-tbias / tslope, uint256) < _expire_time
+
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
 
     # delegated slope and bias
@@ -371,7 +403,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
-    assert y > tvalue  # dev: cannot reduce value of boost
+    assert y >= tvalue  # dev: cannot reduce value of boost
 
     # (y2 - y1) / (x2 - x1)
     slope: int256 = -y / convert(_expire_time - block.timestamp, int256)  # negative value
@@ -387,6 +419,14 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
 
 @external
 def cancel_boost(_token_id: uint256):
+    """
+    @notice Cancel an outstanding boost
+    @dev This does not burn the token, only the boost it represents. The owner
+        of the token or their operator can cancel a boost at any time. The
+        delegator or their operator can only cancel a token after the cancel
+        time. Anyone can cancel the boost if the value of it is negative.
+    @param _token_id The token to cancel
+    """
     receiver: address = self.ownerOf[_token_id]
     delegator: address = convert(shift(_token_id, -96), address)
 

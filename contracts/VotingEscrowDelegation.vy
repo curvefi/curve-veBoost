@@ -37,14 +37,12 @@ ownerOf: public(HashMap[uint256, address])
 
 name: public(String[32])
 symbol: public(String[32])
-tokenURI: public(String[2])
 
 
 @external
-def __init__(_name: String[32], _symbol: String[32], _base_uri: String[128]):
+def __init__(_name: String[32], _symbol: String[32]):
     self.name = _name
     self.symbol = _symbol
-    self.tokenURI = ""
 
 
 @internal
@@ -187,3 +185,8 @@ def _burn_for_testing(_token_id: uint256):
     self._burn(_token_id)
 
 #@ endif
+
+@view
+@external
+def tokenURI(_token_id: uint256) -> String[2]:
+    return ""

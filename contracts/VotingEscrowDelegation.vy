@@ -137,6 +137,12 @@ def _transfer_boost(_from: address, _to: address, _bias: int256, _slope: int256)
     self.boost[_to].received += data
 
 
+@pure
+@internal
+def _deconstruct_bias_slope(_data: uint256) -> (int256, int256):
+    return convert(shift(_data, -128), int256), -convert(_data % 2 ** 128, int256)
+
+
 @external
 def approve(_approved: address, _token_id: uint256):
     """

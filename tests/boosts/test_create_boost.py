@@ -107,7 +107,7 @@ def test_implicit_token_existence_check(alice, alice_unlock_time, veboost):
 
 def test_id_out_of_bounds(alice, alice_unlock_time, veboost):
     with brownie.reverts("dev: id out of bounds"):
-        veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 2 ** 56, {"from": alice})
+        veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 2 ** 96, {"from": alice})
 
 
 def test_expire_time_after_lock_expiry_reverts(alice, alice_unlock_time, veboost):

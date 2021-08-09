@@ -356,7 +356,7 @@ def create_boost(
 
     assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast MIN_DELEGATION_TIME
     assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
-    assert _id < 2 ** 56  # dev: id out of bounds
+    assert _id < 2 ** 96  # dev: id out of bounds
 
     # [delegator address 160][cancel_time uint40][id uint56]
     token_id: uint256 = shift(convert(_delegator, uint256), 96) + _id

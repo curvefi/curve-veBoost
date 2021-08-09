@@ -69,21 +69,6 @@ def _approve(_owner: address, _approved: address, _token_id: uint256):
     log Approval(_owner, _approved, _token_id)
 
 
-@internal
-def _transfer(_from: address, _to: address, _token_id: uint256):
-    assert self.ownerOf[_token_id] == _from  # dev: _from is not owner
-    assert _to != ZERO_ADDRESS  # dev: transfers to ZERO_ADDRESS are disallowed
-
-    # clear previous token approval
-    self._approve(_from, ZERO_ADDRESS, _token_id)
-
-    self.balanceOf[_from] -= 1
-    self.balanceOf[_to] += 1
-    self.ownerOf[_token_id] = _to
-
-    log Transfer(_from, _to, _token_id)
-
-
 @view
 @internal
 def _is_approved_or_owner(_spender: address, _token_id: uint256) -> bool:
@@ -145,6 +130,31 @@ def _transfer_boost(_from: address, _to: address, _bias: int256, _slope: int256)
 @internal
 def _deconstruct_bias_slope(_data: uint256) -> (int256, int256):
     return convert(shift(_data, -128), int256), -convert(_data % 2 ** 128, int256)
+
+
+@internal
+def _transfer(_from: address, _to: address, _token_id: uint256):
+    assert self.ownerOf[_token_id] == _from  # dev: _from is not owner
+    assert _to != ZERO_ADDRESS  # dev: transfers to ZERO_ADDRESS are disallowed
+
+    # clear previous token approval
+    self._approve(_from, ZERO_ADDRESS, _token_id)
+
+    self.balanceOf[_from] -= 1
+    self.balanceOf[_to] += 1
+    self.ownerOf[_token_id] = _to
+
+    bias: int256 = 0
+    slope: int256 = 0
+    bias, slope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+
+    # if the boost value is negative, reset the slope and bias
+    if slope * convert(block.timestamp, int256) + bias > 0:
+        self._transfer_boost(_from, _to, bias, slope)
+    else:
+        self._burn_boost(_token_id, convert(shift(_token_id, -96), address), _from, bias, slope)
+
+    log Transfer(_from, _to, _token_id)
 
 
 @external

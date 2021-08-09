@@ -539,7 +539,7 @@ def adjusted_balance_of(_account: address) -> uint256:
 def commit_transfer_ownership(_addr: address):
     """
     @notice Transfer ownership of contract to `addr`
-    @param addr Address to have ownership transferred to
+    @param _addr Address to have ownership transferred to
     """
     assert msg.sender == self.admin  # dev: admin only
     self.future_admin = _addr

@@ -431,8 +431,10 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     # assert the new expiry is ahead of the already existing expiry, otherwise
     # this isn't really an extension
     token_expiry: uint256 = convert(-tbias / tslope, uint256)
-    assert token_expiry < _expire_time
+    assert _expire_time > token_expiry  # dev: new expiration must be greater than old token expiry
 
+    # if we are extending an unexpired boost, the cancel time must the same or greater
+    # else we can adjust the cancel time to our preference
     if block.timestamp < token_expiry:
         assert _cancel_time >= token.cancel_time  # dev: reducing cancel time is disallowed
 

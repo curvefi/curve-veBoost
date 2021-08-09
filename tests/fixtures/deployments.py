@@ -15,7 +15,7 @@ def vecrv(alice, crv, pm):
 
 
 @pytest.fixture(scope="session")
-def ve_delegation(alice, VotingEscrowDelegation, vecrv):
+def veboost(alice, VotingEscrowDelegation, vecrv):
     source = VotingEscrowDelegation._build["source"]
     source = source.replace(ZERO_ADDRESS, vecrv.address)
 

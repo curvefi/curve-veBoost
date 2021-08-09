@@ -447,7 +447,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     # if we are extending an unexpired boost, the cancel time must the same or greater
     # else we can adjust the cancel time to our preference
     if _cancel_time < token.cancel_time:
-        assert block.timestamp > token_expiry  # dev: cancel time reduction disallowed
+        assert block.timestamp >= token_expiry  # dev: cancel time reduction disallowed
 
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
 

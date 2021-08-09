@@ -622,6 +622,19 @@ def token_expiry(_token_id: uint256) -> uint256:
     return convert(-tbias/tslope, uint256)
 
 
+@view
+@external
+def token_cancel_time(_token_id: uint256) -> uint256:
+    """
+    @notice Query the timestamp of a boost token's cancel time. This is
+        the point at which the delegator can nullify the boost. A receiver
+        can cancel a token at any point. Anyone can nullify a token's boost
+        after it's expiration.
+    @param _token_id The token id to query
+    """
+    return self.boost_token[_token_id].cancel_time
+
+
 @external
 def commit_transfer_ownership(_addr: address):
     """

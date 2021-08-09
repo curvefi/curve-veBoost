@@ -33,9 +33,36 @@ event Transfer:
     _to: indexed(address)
     _token_id: indexed(uint256)
 
+event BurnBoost:
+    _delegator: indexed(address)
+    _receiver: indexed(address)
+    _token_id: indexed(uint256)
+
+event DelegateBoost:
+    _delegator: indexed(address)
+    _receiver: indexed(address)
+    _token_id: indexed(uint256)
+    _amount: uint256
+    _cancel_time: uint256
+    _expiration: uint256
+
+event ExtendBoost:
+    _delegator: indexed(address)
+    _receiver: indexed(address)
+    _token_id: indexed(uint256)
+    _amount: uint256
+    _expire_time: uint256
+
+event TransferBoost:
+    _from: indexed(address)
+    _to: indexed(address)
+    _token_id: indexed(uint256)
+    _amount: uint256
+    _expiration: uint256
+
 
 struct Boost:
-    # [bias uint128][slope uint128]
+    # [bias uint128][slope int128]
     delegated: uint256
     received: uint256
 
@@ -144,15 +171,20 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
     self.balanceOf[_to] += 1
     self.ownerOf[_token_id] = _to
 
-    bias: int256 = 0
-    slope: int256 = 0
-    bias, slope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tbias: int256 = 0
+    tslope: int256 = 0
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+
+    tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
 
     # if the boost value is negative, reset the slope and bias
-    if slope * convert(block.timestamp, int256) + bias > 0:
-        self._transfer_boost(_from, _to, bias, slope)
+    if tvalue > 0:
+        self._transfer_boost(_from, _to, tbias, tslope)
+        # y = mx + b -> y - b = mx -> (y - b)/m = x -> -b / m = x (x-intercept)
+        expiry: uint256 = convert(-tbias / tslope, uint256)
+        log TransferBoost(_from, _to, _token_id, convert(tvalue, uint256), expiry)
     else:
-        self._burn_boost(_token_id, convert(shift(_token_id, -96), address), _from, bias, slope)
+        self._burn_boost(_token_id, convert(shift(_token_id, -96), address), _from, tbias, tslope)
 
     log Transfer(_from, _to, _token_id)
 
@@ -299,9 +331,11 @@ def create_boost(
 
     self._mint_boost(token_id, _delegator, _receiver, bias, slope)
 
+    log DelegateBoost(_delegator, _receiver, token_id, convert(y, uint256), _cancel_time, _expire_time)
+
 
 @external
-def extend_boost(_percentage: int256, _expire_time: uint256, _token_id: uint256):
+def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256):
     delegator: address = convert(shift(_token_id, -96), address)
     receiver: address = self.ownerOf[_token_id]
 
@@ -348,6 +382,8 @@ def extend_boost(_percentage: int256, _expire_time: uint256, _token_id: uint256)
 
     self._mint_boost(_token_id, delegator, receiver, bias, slope)
 
+    log ExtendBoost(delegator, receiver, _token_id, convert(y, uint256), _expire_time)
+
 
 @external
 def cancel_boost(_token_id: uint256):
@@ -368,6 +404,8 @@ def cancel_boost(_token_id: uint256):
             # All others are disallowed
             raise "Not allowed!"
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+
+    log BurnBoost(delegator, receiver, _token_id)
 
 
 @view

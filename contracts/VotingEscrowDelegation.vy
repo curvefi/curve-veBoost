@@ -281,7 +281,7 @@ def delegate_boost(
     # delegated slope and bias
     dslope: int256 = 0
     dbias: int256 = 0
-    dslope, dbias = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
+    dbias, dslope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
 
     # verify delegated boost isn't negative, else it'll inflate out vecrv balance
     delegated_boost: int256 = dslope * time + dbias

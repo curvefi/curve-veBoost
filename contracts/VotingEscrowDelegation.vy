@@ -35,7 +35,7 @@ event Transfer:
 
 
 struct Boost:
-    # [bias int128][slope int128]
+    # [bias uint128][slope uint128]
     delegated: uint256
     received: uint256
 
@@ -52,6 +52,7 @@ name: public(String[32])
 symbol: public(String[32])
 
 boost: HashMap[address, Boost]
+token: HashMap[uint256, uint256]
 
 
 @external
@@ -113,6 +114,27 @@ def _mint(_to: address, _token_id: uint256):
     self.ownerOf[_token_id] = _to
 
     log Transfer(ZERO_ADDRESS, _to, _token_id)
+
+
+@internal
+def _mint_boost(_delegator: address, _receiver: address, _bias: int256, _slope: int256):
+    data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
+    self.boost[_delegator].delegated += data
+    self.boost[_receiver].received += data
+
+
+@internal
+def _burn_boost(_delegator: address, _receiver: address, _bias: int256, _slope: int256):
+    data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
+    self.boost[_delegator].delegated -= data
+    self.boost[_receiver].received -= data
+
+
+@internal
+def _transfer_boost(_from: address, _to: address, _bias: int256, _slope: int256):
+    data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
+    self.boost[_from].received -= data
+    self.boost[_to].received += data
 
 
 @external

@@ -83,6 +83,8 @@ symbol: public(String[32])
 boost: HashMap[address, Boost]
 boost_token: HashMap[uint256, uint256]
 
+is_killed: public(bool)
+
 
 @external
 def __init__(_name: String[32], _symbol: String[32]):
@@ -483,6 +485,10 @@ def adjusted_balance_of(_account: address) -> uint256:
     @param _account The account to query the adjusted balance of
     """
     vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_account), int256)
+
+    if self.is_killed:
+        return convert(vecrv_balance, uint256)
+
     boost: Boost = self.boost[_account]
     time: int256 = convert(block.timestamp, int256)
 

@@ -2,7 +2,7 @@ import math
 
 import brownie
 import pytest
-from brownie import ZERO_ADDRESS
+from brownie import ZERO_ADDRESS, convert
 
 pytestmark = pytest.mark.usefixtures("lock_alice")
 
@@ -12,8 +12,8 @@ WEEK = DAY * 7
 
 
 def test_create_a_boost(alice, bob, chain, alice_unlock_time, veboost, vecrv):
-    tx = veboost.create_boost(alice, bob, 10_000, 0, alice_unlock_time, 0, {"from": alice})
-    token_id = tx.events["DelegateBoost"]["_token_id"]
+    veboost.create_boost(alice, bob, 10_000, 0, alice_unlock_time, 0, {"from": alice})
+    token_id = convert.to_uint(alice.address) << 96
 
     with brownie.multicall(block_identifier=chain.height):
         alice_adj_balance = veboost.adjusted_balance_of(alice)

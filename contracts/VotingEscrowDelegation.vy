@@ -553,3 +553,13 @@ def accept_transfer_ownership():
     future_admin: address = self.future_admin
     assert msg.sender == future_admin
     self.admin = future_admin
+
+
+@external
+def set_killed(_killed: bool):
+    """
+    @notice Set the kill status of the contract
+    @param _killed Kill state to put the contract in, True = killed, False = alive
+    """
+    assert msg.sender == self.admin
+    self.is_killed = _killed

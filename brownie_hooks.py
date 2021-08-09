@@ -8,6 +8,5 @@ def brownie_load_source(path: Path, source: str) -> str:
     if path.stem != "VotingEscrowDelegation":
         return source
 
-    template = Template(source, line_statement_prefix="#@")
-    is_test = CONFIG.mode == "test"
-    return template.render(is_test=is_test)
+    template = Template(source, line_statement_prefix="#@", trim_blocks=True, lstrip_blocks=True)
+    return template.render(mode=CONFIG.mode)

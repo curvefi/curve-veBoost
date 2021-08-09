@@ -83,6 +83,8 @@ symbol: public(String[32])
 boost: HashMap[address, Boost]
 boost_token: HashMap[uint256, uint256]
 
+admin: public(address)  # Can and will be a smart contract
+future_admin: public(address)
 is_killed: public(bool)
 
 
@@ -531,3 +533,23 @@ def adjusted_balance_of(_account: address) -> uint256:
     # when delegating boost, received boost isn't used for determining how
     # much we can delegate.
     return convert(max(adjusted_balance, empty(int256)), uint256)
+
+
+@external
+def commit_transfer_ownership(_addr: address):
+    """
+    @notice Transfer ownership of contract to `addr`
+    @param addr Address to have ownership transferred to
+    """
+    assert msg.sender == self.admin  # dev: admin only
+    self.future_admin = _addr
+
+
+@external
+def accept_transfer_ownership():
+    """
+    @notice Accept admin role, only callable by future admin
+    """
+    future_admin: address = self.future_admin
+    assert msg.sender == future_admin
+    self.admin = future_admin

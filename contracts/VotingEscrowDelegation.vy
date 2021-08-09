@@ -298,3 +298,52 @@ def delegate_boost(
     bias: int256 = y - slope * time
 
     self._mint_boost(token_id, _delegator, _receiver, bias, slope)
+
+
+@external
+def extend_boost(_percentage: int256, _expire_time: uint256, _token_id: uint256):
+    delegator: address = convert(shift(_token_id, -96), address)
+    receiver: address = self.ownerOf[_token_id]
+
+    assert msg.sender == delegator or self.isApprovedForAll[delegator][msg.sender]  # dev: only delegator or operator
+    assert _percentage > 0  # dev: percentage must be greater than 0 bps
+    assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
+
+    # timstamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
+    lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(delegator)
+
+    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
+    assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
+
+    time: int256 = convert(block.timestamp, int256)
+    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(delegator), int256)
+
+    tslope: int256 = 0
+    tbias: int256 = 0
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tvalue: int256 = tslope * time + tbias
+
+    self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+
+    # delegated slope and bias
+    dslope: int256 = 0
+    dbias: int256 = 0
+    dbias, dslope = self._deconstruct_bias_slope(self.boost[delegator].delegated)
+
+    # verify delegated boost isn't negative, else it'll inflate out vecrv balance
+    delegated_boost: int256 = dslope * time + dbias
+    assert delegated_boost >= 0  # dev: outstanding negative boosts
+
+    y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
+    assert y > 0  # dev: no boost
+
+    assert y > tvalue  # dev: cannot reduce value of boost
+
+    # (y2 - y1) / (x2 - x1)
+    slope: int256 = -y / convert(_expire_time - block.timestamp, int256)  # negative value
+    assert slope < 0  # dev: invalid slope
+
+    # y = mx + b -> y - mx = b
+    bias: int256 = y - slope * time
+
+    self._mint_boost(_token_id, delegator, receiver, bias, slope)

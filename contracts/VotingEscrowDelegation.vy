@@ -263,6 +263,12 @@ def transferFrom(_from: address, _to: address, _token_id: uint256):
     assert self._is_approved_or_owner(msg.sender, _token_id)  # dev: neither owner nor approved
     self._transfer(_from, _to, _token_id)
 
+
+@view
+@external
+def tokenURI(_token_id: uint256) -> String[2]:
+    return ""
+
 #@ if is_test:
 
 @external
@@ -274,12 +280,6 @@ def _burn_for_testing(_token_id: uint256):
     self._burn(_token_id)
 
 #@ endif
-
-@view
-@external
-def tokenURI(_token_id: uint256) -> String[2]:
-    return ""
-
 
 @external
 def create_boost(

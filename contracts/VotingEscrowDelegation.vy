@@ -40,6 +40,8 @@ struct Boost:
     received: uint256
 
 
+MAX_PCT: constant(uint256) = 10_000
+MIN_DELEGATION_TIME: constant(uint256) = 86400
 VOTING_ESCROW: constant(address) = 0x0000000000000000000000000000000000000000
 
 
@@ -52,7 +54,7 @@ name: public(String[32])
 symbol: public(String[32])
 
 boost: HashMap[address, Boost]
-token: HashMap[uint256, uint256]
+boost_token: HashMap[uint256, uint256]
 
 
 @external
@@ -117,17 +119,19 @@ def _mint(_to: address, _token_id: uint256):
 
 
 @internal
-def _mint_boost(_delegator: address, _receiver: address, _bias: int256, _slope: int256):
+def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256):
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated += data
     self.boost[_receiver].received += data
+    self.boost_token[_token_id] = data
 
 
 @internal
-def _burn_boost(_delegator: address, _receiver: address, _bias: int256, _slope: int256):
+def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256):
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated -= data
     self.boost[_receiver].received -= data
+    self.boost_token[_token_id] = 0
 
 
 @internal
@@ -233,3 +237,54 @@ def _burn_for_testing(_token_id: uint256):
 @external
 def tokenURI(_token_id: uint256) -> String[2]:
     return ""
+
+
+@external
+def delegate_boost(
+    _delegator: address,
+    _receiver: address,
+    _percentage: int256,
+    _cancel_time: uint256,
+    _expire_time: uint256,
+    _id: uint256,
+):
+    assert msg.sender == _delegator or self.isApprovedForAll[_delegator][msg.sender]  # dev: only delegator or operator
+    assert _percentage > 0  # dev: percentage must be greater than 0 bps
+    assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
+    assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
+
+    # timstamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
+    lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(_delegator)
+
+    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
+    assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
+    assert _id < 2 ** 56  # dev: id out of bounds
+
+    # [delegator address 160][cancel_time uint40][id uint56]
+    token_id: uint256 = shift(convert(_delegator, uint256), 96) + shift(_cancel_time, 56) + _id
+    # check if the token exists here before we expend more gas by minting it
+    self._mint(_receiver, token_id)
+
+    time: int256 = convert(block.timestamp, int256)
+    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_delegator), int256)
+
+    # delegated slope and bias
+    dslope: int256 = 0
+    dbias: int256 = 0
+    dslope, dbias = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
+
+    # verify delegated boost isn't negative, else it'll inflate out vecrv balance
+    delegated_boost: int256 = dslope * time + dbias
+    assert delegated_boost >= 0  # dev: outstanding negative boosts
+
+    y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
+    assert y > 0  # dev: no boost
+
+    # (y2 - y1) / (x2 - x1)
+    slope: int256 = -y / convert(_expire_time - block.timestamp, int256)  # negative value
+    assert slope < 0  # dev: invalid slope
+
+    # y = mx + b -> y - mx = b
+    bias: int256 = y - slope * time
+
+    self._mint_boost(token_id, _delegator, _receiver, bias, slope)

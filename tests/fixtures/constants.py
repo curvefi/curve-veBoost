@@ -1,5 +1,4 @@
 import pytest
-from brownie import convert
 
 DAY = 86400
 WEEK = DAY * 7
@@ -24,11 +23,6 @@ def bob_lock_value():
 @pytest.fixture
 def bob_unlock_time(chain):
     return ((chain.time() + DAY * 365 * 2) // WEEK) * WEEK
-
-
-@pytest.fixture(scope="session")
-def token_id(alice):
-    return lambda account, _id: _id + convert.to_uint(account) << 96
 
 
 @pytest.fixture

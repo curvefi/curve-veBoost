@@ -13,6 +13,10 @@ interface ERC721Receiver:
     ) -> bytes32:
         nonpayable
 
+interface VotingEscrow:
+    def balanceOf(_account: address) -> uint256: view
+    def locked__end(_addr: address) -> uint256: view
+
 
 event Approval:
     _owner: indexed(address)
@@ -34,6 +38,9 @@ struct Boost:
     # [bias int128][slope int128]
     delegated: uint256
     received: uint256
+
+
+VOTING_ESCROW: constant(address) = 0x0000000000000000000000000000000000000000
 
 
 balanceOf: public(HashMap[address, uint256])

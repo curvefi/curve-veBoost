@@ -347,3 +347,24 @@ def extend_boost(_percentage: int256, _expire_time: uint256, _token_id: uint256)
     bias: int256 = y - slope * time
 
     self._mint_boost(_token_id, delegator, receiver, bias, slope)
+
+
+@external
+def cancel_boost(_token_id: uint256):
+    receiver: address = self.ownerOf[_token_id]
+    delegator: address = convert(shift(_token_id, -96), address)
+
+    tslope: int256 = 0
+    tbias: int256 = 0
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
+
+    # if not (the owner or operator or the boost value is negative)
+    if not (msg.sender == receiver or self.isApprovedForAll[receiver][msg.sender] or tvalue < 0):
+        if msg.sender == delegator or self.isApprovedForAll[delegator][msg.sender]:
+            # if delegator or operator, wait till after cancel time
+            assert shift(_token_id, -56) % 2 ** 40 <= block.timestamp
+        else:
+            # All others are disallowed
+            raise "Not allowed!"
+    self._burn_boost(_token_id, delegator, receiver, tbias, tslope)

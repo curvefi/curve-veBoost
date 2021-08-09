@@ -1,3 +1,4 @@
+import brownie
 import pytest
 from brownie import ZERO_ADDRESS, compile_source
 
@@ -21,3 +22,8 @@ def veboost(alice, VotingEscrowDelegation, vecrv):
 
     NewVotingEscrowDelegation = compile_source(source).Vyper
     return NewVotingEscrowDelegation.deploy("Curve veCRV Boost", "veCRV-Boost", {"from": alice})
+
+
+@pytest.fixture(scope="session", autouse=True)
+def multicall(alice):
+    return brownie.multicall.deploy({"from": alice})

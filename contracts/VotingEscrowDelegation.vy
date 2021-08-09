@@ -44,7 +44,7 @@ event DelegateBoost:
     _token_id: indexed(uint256)
     _amount: uint256
     _cancel_time: uint256
-    _expiration: uint256
+    _expire_time: uint256
 
 event ExtendBoost:
     _delegator: indexed(address)
@@ -52,19 +52,25 @@ event ExtendBoost:
     _token_id: indexed(uint256)
     _amount: uint256
     _expire_time: uint256
+    _cancel_time: uint256
 
 event TransferBoost:
     _from: indexed(address)
     _to: indexed(address)
     _token_id: indexed(uint256)
     _amount: uint256
-    _expiration: uint256
+    _expire_time: uint256
 
 
 struct Boost:
     # [bias uint128][slope int128]
     delegated: uint256
     received: uint256
+
+struct Token:
+    # [bias uint128][slope int128]
+    data: uint256
+    cancel_time: uint256
 
 
 MAX_PCT: constant(uint256) = 10_000
@@ -85,7 +91,7 @@ name: public(String[32])
 symbol: public(String[32])
 
 boost: HashMap[address, Boost]
-boost_token: HashMap[uint256, uint256]
+boost_token: HashMap[uint256, Token]
 
 admin: public(address)  # Can and will be a smart contract
 future_admin: public(address)
@@ -139,11 +145,11 @@ def _mint(_to: address, _token_id: uint256):
 
 
 @internal
-def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256):
+def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256, _cancel_time: uint256):
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated += data
     self.boost[_receiver].received += data
-    self.boost_token[_token_id] = data
+    self.boost_token[_token_id] = Token({data: data, cancel_time: _cancel_time})
 
 
 @internal
@@ -151,7 +157,7 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated -= data
     self.boost[_receiver].received -= data
-    self.boost_token[_token_id] = 0
+    self.boost_token[_token_id] = empty(Token)
 
 
 @internal
@@ -181,7 +187,7 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
 
     tbias: int256 = 0
     tslope: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
 
     tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
 
@@ -288,7 +294,7 @@ def burn(_token_id: uint256):
     """
     assert self._is_approved_or_owner(msg.sender, _token_id)  # dev: neither owner nor approved
 
-    tdata: uint256 = self.boost_token[_token_id]
+    tdata: uint256 = self.boost_token[_token_id].data
     if tdata != 0:
         tslope: int256 = 0
         tbias: int256 = 0
@@ -353,7 +359,7 @@ def create_boost(
     assert _id < 2 ** 56  # dev: id out of bounds
 
     # [delegator address 160][cancel_time uint40][id uint56]
-    token_id: uint256 = shift(convert(_delegator, uint256), 96) + shift(_cancel_time, 56) + _id
+    token_id: uint256 = shift(convert(_delegator, uint256), 96) + _id
     # check if the token exists here before we expend more gas by minting it
     self._mint(_receiver, token_id)
 
@@ -379,13 +385,13 @@ def create_boost(
     # y = mx + b -> y - mx = b
     bias: int256 = y - slope * time
 
-    self._mint_boost(token_id, _delegator, _receiver, bias, slope)
+    self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time)
 
     log DelegateBoost(_delegator, _receiver, token_id, convert(y, uint256), _cancel_time, _expire_time)
 
 
 @external
-def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256):
+def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256, _cancel_time: uint256):
     """
     @notice Extend the boost of an existing boost or expired boost
     @dev The extension can not decrease the value of the boost. If there are
@@ -408,7 +414,9 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
 
     # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(delegator)
+    token: Token = self.boost_token[_token_id]
 
+    assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
     assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
     assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
 
@@ -417,12 +425,16 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
 
     tslope: int256 = 0
     tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tbias, tslope = self._deconstruct_bias_slope(token.data)
     tvalue: int256 = tslope * time + tbias
 
     # assert the new expiry is ahead of the already existing expiry, otherwise
     # this isn't really an extension
-    assert convert(-tbias / tslope, uint256) < _expire_time
+    token_expiry: uint256 = convert(-tbias / tslope, uint256)
+    assert token_expiry < _expire_time
+
+    if block.timestamp < token_expiry:
+        assert _cancel_time >= token.cancel_time  # dev: reducing cancel time is disallowed
 
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
 
@@ -447,9 +459,9 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256)
     # y = mx + b -> y - mx = b
     bias: int256 = y - slope * time
 
-    self._mint_boost(_token_id, delegator, receiver, bias, slope)
+    self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time)
 
-    log ExtendBoost(delegator, receiver, _token_id, convert(y, uint256), _expire_time)
+    log ExtendBoost(delegator, receiver, _token_id, convert(y, uint256), _expire_time, _cancel_time)
 
 
 @external
@@ -465,16 +477,17 @@ def cancel_boost(_token_id: uint256):
     receiver: address = self.ownerOf[_token_id]
     delegator: address = convert(shift(_token_id, -96), address)
 
+    token: Token = self.boost_token[_token_id]
     tslope: int256 = 0
     tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tbias, tslope = self._deconstruct_bias_slope(token.data)
     tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
 
     # if not (the owner or operator or the boost value is negative)
     if not (msg.sender == receiver or self.isApprovedForAll[receiver][msg.sender] or tvalue < 0):
         if msg.sender == delegator or self.isApprovedForAll[delegator][msg.sender]:
             # if delegator or operator, wait till after cancel time
-            assert shift(_token_id, -56) % 2 ** 40 <= block.timestamp
+            assert token.cancel_time <= block.timestamp
         else:
             # All others are disallowed
             raise "Not allowed!"
@@ -584,7 +597,7 @@ def token_boost(_token_id: uint256) -> int256:
     """
     tslope: int256 = 0
     tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id])
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
     time: int256 = convert(block.timestamp, int256)
     return tslope * time + tbias
 

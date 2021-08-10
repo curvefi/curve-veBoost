@@ -206,8 +206,9 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
     assert self.ownerOf[_token_id] == _from  # dev: _from is not owner
     assert _to != ZERO_ADDRESS  # dev: transfers to ZERO_ADDRESS are disallowed
 
+    delegator: address = convert(shift(_token_id, -96), address)
     is_whitelist: uint256 = convert(self.grey_list[_to][ZERO_ADDRESS], uint256)
-    delegator_status: uint256 = convert(self.grey_list[_to][convert(shift(_token_id, -96), address)], uint256)
+    delegator_status: uint256 = convert(self.grey_list[_to][delegator], uint256)
     assert not convert(bitwise_xor(is_whitelist, delegator_status), bool)
 
     # clear previous token approval
@@ -230,7 +231,8 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
         expiry: uint256 = convert(-tbias / tslope, uint256)
         log TransferBoost(_from, _to, _token_id, convert(tvalue, uint256), expiry)
     else:
-        self._burn_boost(_token_id, convert(shift(_token_id, -96), address), _from, tbias, tslope)
+        self._burn_boost(_token_id, delegator, _from, tbias, tslope)
+        log BurnBoost(delegator, _from, _token_id)
 
     log Transfer(_from, _to, _token_id)
 

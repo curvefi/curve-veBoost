@@ -74,7 +74,7 @@ struct Token:
 
 
 MAX_PCT: constant(uint256) = 10_000
-MIN_DELEGATION_TIME: constant(uint256) = 86400
+MIN_DELEGATION_TIME: constant(uint256) = 86400 * 7
 #@ if mode == "test":
 VOTING_ESCROW: constant(address) = 0x0000000000000000000000000000000000000000
 #@ else:

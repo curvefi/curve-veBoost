@@ -61,6 +61,11 @@ event TransferBoost:
     _amount: uint256
     _expire_time: uint256
 
+event GreyListUpdated:
+    _receiver: indexed(address)
+    _delegator: indexed(address)
+    _status: bool
+
 
 struct Boost:
     # [bias uint128][slope int128]
@@ -100,10 +105,11 @@ is_killed: public(bool)
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist
 # gray_list[_receiver][_delegator]
+# by default is blacklist, with no delegators blacklisted
 # if [_receiver][ZERO_ADDRESS] is False = Blacklist, True = Whitelist
 # if this is a blacklist, receivers disallow any delegations from _delegator if it is True
 # if this is a whitelist, receivers only allow delegations from _delegator if it is True
-# Result is: not (grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][_delegator])
+# Delegation will go through if: not (grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][_delegator])
 grey_list: public(HashMap[address, HashMap[address, bool]])
 
 
@@ -256,6 +262,7 @@ def _cancel_boost(_token_id: uint256, _caller: address):
 @internal
 def _set_delegation_status(_receiver: address, _delegator: address, _status: bool):
     self.grey_list[_receiver][_delegator] = _status
+    log GreyListUpdated(_receiver, _delegator, _status)
 
 
 @external

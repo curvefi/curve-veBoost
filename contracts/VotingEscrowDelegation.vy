@@ -200,8 +200,8 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
     assert self.ownerOf[_token_id] == _from  # dev: _from is not owner
     assert _to != ZERO_ADDRESS  # dev: transfers to ZERO_ADDRESS are disallowed
 
-    is_whitelist: uint256 = convert(self.grey_list[_receiver][ZERO_ADDRESS], uint256)
-    delegator_status: uint256 = convert(self.grey_list[_receiver][_delegator], uint256)
+    is_whitelist: uint256 = convert(self.grey_list[_to][ZERO_ADDRESS], uint256)
+    delegator_status: uint256 = convert(self.grey_list[_to][convert(shift(_token_id, -96), address)], uint256)
     assert not convert(bitwise_xor(is_whitelist, delegator_status), bool)
 
     # clear previous token approval

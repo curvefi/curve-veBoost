@@ -253,6 +253,11 @@ def _cancel_boost(_token_id: uint256, _caller: address):
     log BurnBoost(delegator, receiver, _token_id)
 
 
+@internal
+def _set_delegation_status(_receiver: address, _delegator: address, _status: bool):
+    self.grey_list[_receiver][_delegator] = _status
+
+
 @external
 def approve(_approved: address, _token_id: uint256):
     """
@@ -547,11 +552,6 @@ def batch_cancel_boosts(_token_ids: uint256[256]):
         if _token_id == 0:
             break
         self._cancel_boost(_token_id, msg.sender)
-
-
-@internal
-def _set_delegation_status(_receiver: address, _delegator: address, _status: bool):
-    self.grey_list[_receiver][_delegator] = _status
 
 
 @external

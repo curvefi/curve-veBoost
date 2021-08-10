@@ -21,7 +21,7 @@ def test_extend_an_existing_boost_modify_(
         token, 7_500, expire_time + expiry_delta, cancel_time + cancel_delta, {"from": alice}
     )
 
-    assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5)
+    assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5, rel_tol=1e-6)
     assert veboost.token_expiry(token) == expire_time + expiry_delta
     assert veboost.token_cancel_time(token) == cancel_time + cancel_delta
 

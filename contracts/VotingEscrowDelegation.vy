@@ -97,6 +97,15 @@ admin: public(address)  # Can and will be a smart contract
 future_admin: public(address)
 is_killed: public(bool)
 
+# The grey list - per-user black and white lists
+# users can make this a blacklist or a whitelist - defaults to blacklist
+# gray_list[_receiver][_delegator]
+# if [_receiver][ZERO_ADDRESS] is False = Blacklist, True = Whitelist
+# if this is a blacklist, receivers disallow any delegations from _delegator if it is True
+# if this is a whitelist, receivers only allow delegations from _delegator if it is True
+# Result is: not (grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][_delegator])
+grey_list: public(HashMap[address, HashMap[address, bool]])
+
 
 @external
 def __init__(_name: String[32], _symbol: String[32]):
@@ -530,6 +539,46 @@ def batch_cancel_boosts(_token_ids: uint256[256]):
         if _token_id == 0:
             break
         self._cancel_boost(_token_id, msg.sender)
+
+
+@internal
+def _set_delegation_status(_receiver: address, _delegator: address, _status: bool):
+    self.grey_list[_receiver][_delegator] = _status
+
+
+@external
+def set_delegation_status(_receiver: address, _delegator: address, _status: bool):
+    """
+    @notice Set or reaffirm the blacklist/whitelist status of a delegator for a receiver.
+    @dev Setting delegator as the ZERO_ADDRESS enables users to deactive delegations globally
+        and enable the white list. The ability of a delegator to delegate to a receiver
+        is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][ZERO_ADDRESS]).
+    @param _receiver The account which we will be updating it's list
+    @param _delegator The account to disallow/allow delegations from
+    @param _status Boolean of the status to set the _delegator account to
+    """
+    assert msg.sender == _receiver or self.isApprovedForAll[_receiver][msg.sender]
+    self._set_delegation_status(_receiver, _delegator, _status)
+
+
+@external
+def batch_set_delegation_status(_receiver: address, _delegators: address[256], _status: bool[256], _stop_idx: uint256):
+    """
+    @notice Set or reaffirm the blacklist/whitelist status of multiple delegators for a receiver.
+    @dev Setting delegator as the ZERO_ADDRESS enables users to deactive delegations globally
+        and enable the white list. The ability of a delegator to delegate to a receiver
+        is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][ZERO_ADDRESS]).
+    @param _receiver The account which we will be updating it's list
+    @param _delegators List of 256 accounts to disallow/allow delegations from
+    @param _status List of 256 booleans of the status to set the _delegator_i account to
+    """
+    assert msg.sender == _receiver or self.isApprovedForAll[_receiver][msg.sender]
+    assert _stop_idx <= 256
+
+    for i in range(256):
+        if i == _stop_idx:
+            break
+        self._set_delegation_status(_receiver, _delegators[i], _status[i])
 
 
 @view

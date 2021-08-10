@@ -86,7 +86,7 @@ def test_varying_percentage_of_available_boost(
 
 
 def test_negative_outstanding_boosts(alice, chain, alice_unlock_time, veboost):
-    expiry = chain.time() + DAY
+    expiry = chain.time() + WEEK
     veboost.create_boost(alice, alice, 10_000, 0, expiry, 0, {"from": alice})
     chain.mine(timestamp=expiry + 1)
     with brownie.reverts("dev: outstanding negative boosts"):

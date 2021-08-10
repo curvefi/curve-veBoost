@@ -97,16 +97,16 @@ def test_decreasing_cancel_time_on_active_token_disallowed(
         veboost.extend_boost(token, 7_000, expire_time, cancel_time - 1, {"from": alice})
 
     chain.mine(timestamp=expire_time)
-    veboost.extend_boost(token, 7_000, expire_time + DAY, cancel_time - 1, {"from": alice})
+    veboost.extend_boost(token, 7_000, chain.time() + WEEK, cancel_time - 1, {"from": alice})
 
 
 def test_outstanding_negative_boosts_prevent_extending_boosts(
     alice, charlie, chain, token_id, expire_time, cancel_time, veboost
 ):
     # give charlie our remaining boost
-    veboost.create_boost(alice, charlie, 10_000, 0, chain.time() + DAY, 1, {"from": alice})
+    veboost.create_boost(alice, charlie, 10_000, 0, chain.time() + WEEK, 1, {"from": alice})
     # fast forward to a day the boost given to charlie has expired
-    chain.mine(timestamp=expire_time - DAY)
+    chain.mine(timestamp=expire_time - WEEK)
 
     with brownie.reverts("dev: outstanding negative boosts"):
         veboost.extend_boost(

@@ -212,6 +212,30 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
     log Transfer(_from, _to, _token_id)
 
 
+@internal
+def _cancel_boost(_token_id: uint256, _caller: address):
+    receiver: address = self.ownerOf[_token_id]
+    delegator: address = convert(shift(_token_id, -96), address)
+
+    token: Token = self.boost_token[_token_id]
+    tslope: int256 = 0
+    tbias: int256 = 0
+    tbias, tslope = self._deconstruct_bias_slope(token.data)
+    tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
+
+    # if not (the owner or operator or the boost value is negative)
+    if not (_caller == receiver or self.isApprovedForAll[receiver][_caller] or tvalue < 0):
+        if _caller == delegator or self.isApprovedForAll[delegator][_caller]:
+            # if delegator or operator, wait till after cancel time
+            assert token.cancel_time <= block.timestamp
+        else:
+            # All others are disallowed
+            raise "Not allowed!"
+    self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+
+    log BurnBoost(delegator, receiver, _token_id)
+
+
 @external
 def approve(_approved: address, _token_id: uint256):
     """
@@ -487,26 +511,25 @@ def cancel_boost(_token_id: uint256):
         time. Anyone can cancel the boost if the value of it is negative.
     @param _token_id The token to cancel
     """
-    receiver: address = self.ownerOf[_token_id]
-    delegator: address = convert(shift(_token_id, -96), address)
+    self._cancel_boost(_token_id, msg.sender)
 
-    token: Token = self.boost_token[_token_id]
-    tslope: int256 = 0
-    tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(token.data)
-    tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
 
-    # if not (the owner or operator or the boost value is negative)
-    if not (msg.sender == receiver or self.isApprovedForAll[receiver][msg.sender] or tvalue < 0):
-        if msg.sender == delegator or self.isApprovedForAll[delegator][msg.sender]:
-            # if delegator or operator, wait till after cancel time
-            assert token.cancel_time <= block.timestamp
-        else:
-            # All others are disallowed
-            raise "Not allowed!"
-    self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+@external
+def batch_cancel_boosts(_token_ids: uint256[256]):
+    """
+    @notice Cancel many outstanding boosts
+    @dev This does not burn the token, only the boost it represents. The owner
+        of the token or their operator can cancel a boost at any time. The
+        delegator or their operator can only cancel a token after the cancel
+        time. Anyone can cancel the boost if the value of it is negative.
+    @param _token_ids A list of 256 token ids to nullify. The list must
+        be padded with 0 values if less than 256 token ids are provided.
+    """
 
-    log BurnBoost(delegator, receiver, _token_id)
+    for _token_id in _token_ids:
+        if _token_id == 0:
+            break
+        self._cancel_boost(_token_id, msg.sender)
 
 
 @view

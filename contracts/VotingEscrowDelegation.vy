@@ -155,6 +155,10 @@ def _mint(_to: address, _token_id: uint256):
 
 @internal
 def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256, _cancel_time: uint256):
+    is_whitelist: uint256 = convert(self.grey_list[_receiver][ZERO_ADDRESS], uint256)
+    delegator_status: uint256 = convert(self.grey_list[_receiver][_delegator], uint256)
+    assert not convert(bitwise_xor(is_whitelist, delegator_status), bool)
+
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated += data
     self.boost[_receiver].received += data
@@ -195,6 +199,10 @@ def _calc_bias_slope(_x: int256, _y: int256, _expire_time: int256) -> (int256, i
 def _transfer(_from: address, _to: address, _token_id: uint256):
     assert self.ownerOf[_token_id] == _from  # dev: _from is not owner
     assert _to != ZERO_ADDRESS  # dev: transfers to ZERO_ADDRESS are disallowed
+
+    is_whitelist: uint256 = convert(self.grey_list[_receiver][ZERO_ADDRESS], uint256)
+    delegator_status: uint256 = convert(self.grey_list[_receiver][_delegator], uint256)
+    assert not convert(bitwise_xor(is_whitelist, delegator_status), bool)
 
     # clear previous token approval
     self._approve(_from, ZERO_ADDRESS, _token_id)

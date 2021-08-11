@@ -442,12 +442,11 @@ def create_boost(
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
-    # (y2 - y1) / (x2 - x1)
-    slope: int256 = -y / convert(_expire_time - block.timestamp, int256)  # negative value
-    assert slope < 0  # dev: invalid slope
+    slope: int256 = 0
+    bias: int256 = 0
+    bias, slope = self._calc_bias_slope(time, y, convert(_expire_time, int256))
 
-    # y = mx + b -> y - mx = b
-    bias: int256 = y - slope * time
+    assert slope < 0  # dev: invalid slope
 
     self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time)
 
@@ -524,12 +523,11 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     assert y >= tvalue  # dev: cannot reduce value of boost
 
-    # (y2 - y1) / (x2 - x1)
-    slope: int256 = -y / convert(_expire_time - block.timestamp, int256)  # negative value
-    assert slope < 0  # dev: invalid slope
+    slope: int256 = 0
+    bias: int256 = 0
+    bias, slope = self._calc_bias_slope(time, y, convert(_expire_time, int256))
 
-    # y = mx + b -> y - mx = b
-    bias: int256 = y - slope * time
+    assert slope < 0  # dev: invalid slope
 
     self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time)
 

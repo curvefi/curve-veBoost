@@ -278,16 +278,18 @@ def _uint_to_string(_value: uint256) -> String[78]:
     buffer: Bytes[78] = b""
     digits: uint256 = 0
 
-    for i in range(1, 79):
+    for i in range(78):
         if _value / 10 ** i == 0:
             digits = i
             break
+        if i == 77 and digits == 0:
+            digits = 78
 
     identity: address = 0x0000000000000000000000000000000000000004
 
     for i in range(0, 78):
         power: int128 = 77 - i
-        value: uint256 = (_value / 10 ** convert(power, uint256)) % 10
+        value: uint256 = ((_value / 10 ** convert(power, uint256)) % 10) + 48
         char: Bytes[1] = slice(convert(value, bytes32), 31, 1)
         buffer = raw_call(identity, concat(buffer, char), max_outsize=78, is_static_call=True)
 

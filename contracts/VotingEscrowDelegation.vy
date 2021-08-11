@@ -516,6 +516,10 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     assert delegated_boost >= 0  # dev: outstanding negative boosts
 
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
+    # a delegator can snipe the exact moment a token expires and create a boost
+    # with 10_000 or some percentage of their boost, which is perfectly fine.
+    # this check is here so the user can't extend a boost unless they actually
+    # have any to give
     assert y > 0  # dev: no boost
 
     assert y >= tvalue  # dev: cannot reduce value of boost

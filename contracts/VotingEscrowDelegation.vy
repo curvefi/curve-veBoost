@@ -118,6 +118,8 @@ def __init__(_name: String[32], _symbol: String[32]):
     self.name = _name
     self.symbol = _symbol
 
+    self.admin = msg.sender
+
 
 @internal
 def _approve(_owner: address, _approved: address, _token_id: uint256):

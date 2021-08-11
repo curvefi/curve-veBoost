@@ -8,7 +8,7 @@ pytestmark = pytest.mark.usefixtures("boost_bob")
 
 @pytest.mark.parametrize("use_operator,timedelta_bps", it.product([False, True], range(0, 110, 50)))
 def test_receiver_can_cancel_at_anytime(
-    alice, bob, charlie, chain, expire_time, token_id, veboost, use_operator, timedelta_bps
+    alice, bob, charlie, chain, expire_time, veboost, use_operator, timedelta_bps
 ):
     caller = bob
     if use_operator:
@@ -18,14 +18,14 @@ def test_receiver_can_cancel_at_anytime(
     fast_forward_amount = int((expire_time - chain.time()) * (timedelta_bps / 100))
     chain.mine(timedelta=fast_forward_amount)
 
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     veboost.cancel_boost(token, {"from": caller})
     assert veboost.token_boost(token) == 0
 
 
 @pytest.mark.parametrize("use_operator,timedelta_bps", it.product([False, True], range(0, 130, 20)))
 def test_delegator_can_cancel_after_cancel_time_or_expiry(
-    alice, charlie, chain, expire_time, cancel_time, token_id, veboost, use_operator, timedelta_bps
+    alice, charlie, chain, expire_time, cancel_time, veboost, use_operator, timedelta_bps
 ):
     caller = alice
     if use_operator:
@@ -35,7 +35,7 @@ def test_delegator_can_cancel_after_cancel_time_or_expiry(
     fast_forward_amount = int((expire_time - chain.time()) * (timedelta_bps / 100))
 
     chain.mine(timedelta=fast_forward_amount)
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
 
     if chain.time() < cancel_time:
         with brownie.reverts("dev: must wait for cancel time"):
@@ -47,13 +47,13 @@ def test_delegator_can_cancel_after_cancel_time_or_expiry(
 
 @pytest.mark.parametrize("timedelta_bps", range(0, 130, 30))
 def test_third_parties_can_only_cancel_past_expiry(
-    alice, charlie, chain, expire_time, token_id, veboost, timedelta_bps
+    alice, charlie, chain, expire_time, veboost, timedelta_bps
 ):
 
     fast_forward_amount = int((expire_time - chain.time()) * (timedelta_bps / 100))
 
     chain.mine(timedelta=fast_forward_amount)
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
 
     if chain.time() < expire_time:
         with brownie.reverts("Not allowed!"):

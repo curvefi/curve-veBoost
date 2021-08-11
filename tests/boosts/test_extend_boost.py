@@ -13,9 +13,9 @@ pytestmark = pytest.mark.usefixtures("boost_bob")
 
 @pytest.mark.parametrize("expiry_delta,cancel_delta", it.product([0, 1], repeat=2))
 def test_extend_an_existing_boost_modify_(
-    alice, token_id, expire_time, veboost, cancel_time, expiry_delta, cancel_delta
+    alice, expire_time, veboost, cancel_time, expiry_delta, cancel_delta
 ):
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     original_boost_value = veboost.token_boost(token)
     veboost.extend_boost(
         token, 7_500, expire_time + expiry_delta, cancel_time + cancel_delta, {"from": alice}
@@ -26,12 +26,10 @@ def test_extend_an_existing_boost_modify_(
     assert veboost.token_cancel_time(token) == cancel_time + cancel_delta
 
 
-def test_delegator_operator_can_extend_a_boost(
-    alice, bob, token_id, expire_time, veboost, cancel_time
-):
+def test_delegator_operator_can_extend_a_boost(alice, bob, expire_time, veboost, cancel_time):
     veboost.setApprovalForAll(bob, True, {"from": alice})
 
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     original_boost_value = veboost.token_boost(token)
     veboost.extend_boost(token, 7_500, expire_time + 1, cancel_time + 1, {"from": alice})
 
@@ -40,8 +38,8 @@ def test_delegator_operator_can_extend_a_boost(
     assert veboost.token_cancel_time(token) == cancel_time + 1
 
 
-def test_only_delegator_or_operator(alice, bob, token_id, expire_time, veboost, cancel_time):
-    token = token_id(alice.address, 0)
+def test_only_delegator_or_operator(alice, bob, expire_time, veboost, cancel_time):
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: only delegator or operator"):
         veboost.extend_boost(token, 7_500, expire_time + 1, cancel_time + 1, {"from": bob})
 
@@ -53,46 +51,42 @@ def test_only_delegator_or_operator(alice, bob, token_id, expire_time, veboost, 
         (10_001, "dev: percentage must be less than 10_000 bps"),
     ],
 )
-def test_invalid_percentage(alice, token_id, expire_time, pct, msg, veboost, cancel_time):
-    token = token_id(alice.address, 0)
+def test_invalid_percentage(alice, expire_time, pct, msg, veboost, cancel_time):
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts(msg):
         veboost.extend_boost(token, pct, expire_time + 1, cancel_time + 1, {"from": alice})
 
 
-def test_new_cancel_time_must_be_less_than_new_expiry(alice, token_id, expire_time, veboost):
-    token = token_id(alice.address, 0)
+def test_new_cancel_time_must_be_less_than_new_expiry(alice, expire_time, veboost):
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: cancel time is after expiry"):
         veboost.extend_boost(token, 7_000, expire_time, expire_time + 1, {"from": alice})
 
 
-def test_new_expiry_must_be_greater_than_min_delegation(
-    alice, chain, token_id, cancel_time, veboost
-):
-    token = token_id(alice.address, 0)
+def test_new_expiry_must_be_greater_than_min_delegation(alice, chain, veboost):
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: boost duration must be atleast one day"):
         veboost.extend_boost(token, 7_000, chain.time(), 0, {"from": alice})
 
 
-def test_new_expiry_must_be_less_than_lock_expiry(
-    alice, alice_unlock_time, token_id, cancel_time, veboost
-):
-    token = token_id(alice.address, 0)
+def test_new_expiry_must_be_less_than_lock_expiry(alice, alice_unlock_time, cancel_time, veboost):
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: boost expiration is past voting escrow lock expiry"):
         veboost.extend_boost(token, 7_000, alice_unlock_time + 1, cancel_time, {"from": alice})
 
 
 def test_expiry_must_be_greater_than_tokens_current_expiry(
-    alice, token_id, expire_time, cancel_time, veboost
+    alice, expire_time, cancel_time, veboost
 ):
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: new expiration must be greater than old token expiry"):
         veboost.extend_boost(token, 7_000, expire_time - 1, cancel_time, {"from": alice})
 
 
 def test_decreasing_cancel_time_on_active_token_disallowed(
-    alice, token_id, chain, expire_time, cancel_time, veboost
+    alice, chain, expire_time, cancel_time, veboost
 ):
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: cancel time reduction disallowed"):
         veboost.extend_boost(token, 7_000, expire_time, cancel_time - 1, {"from": alice})
 
@@ -101,7 +95,7 @@ def test_decreasing_cancel_time_on_active_token_disallowed(
 
 
 def test_outstanding_negative_boosts_prevent_extending_boosts(
-    alice, charlie, chain, token_id, expire_time, cancel_time, veboost
+    alice, charlie, chain, expire_time, cancel_time, veboost
 ):
     # give charlie our remaining boost
     veboost.create_boost(alice, charlie, 10_000, 0, chain.time() + WEEK, 1, {"from": alice})
@@ -110,7 +104,7 @@ def test_outstanding_negative_boosts_prevent_extending_boosts(
 
     with brownie.reverts("dev: outstanding negative boosts"):
         veboost.extend_boost(
-            token_id(alice.address, 0), 7_000, expire_time, cancel_time, {"from": alice}
+            veboost.get_token_id(alice, 0), 7_000, expire_time, cancel_time, {"from": alice}
         )
 
 
@@ -118,14 +112,13 @@ def test_no_boost_available_to_extend_with(
     alice,
     charlie,
     chain,
-    token_id,
     veboost,
     alice_unlock_time,
 ):
     # TODO: how to make this test not fail so often?
     # need someway to make a transaction execute at an exact timestamp
 
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     token_expiry = veboost.token_expiry(token)
 
     # fast forward to when the boost expires
@@ -149,15 +142,13 @@ def test_no_boost_available_to_extend_with(
         veboost.extend_boost(token, 7_000, alice_unlock_time, 0, {"from": alice})
 
 
-def test_extension_cannot_result_in_a_lesser_value(
-    alice, token_id, expire_time, cancel_time, veboost
-):
-    token = token_id(alice.address, 0)
+def test_extension_cannot_result_in_a_lesser_value(alice, expire_time, cancel_time, veboost):
+    token = veboost.get_token_id(alice, 0)
     with brownie.reverts("dev: cannot reduce value of boost"):
         veboost.extend_boost(token, 2_000, expire_time, cancel_time, {"from": alice})
 
 
-def test_slope_cannot_equal_zero(alice, charlie, chain, crv, token_id, vecrv, veboost):
+def test_slope_cannot_equal_zero(alice, charlie, chain, crv, vecrv, veboost):
     # slope can be equal to 0 due to integer division, as the
     # amount of boost we are delegating is divided by the length of the
     # boost period, in which case if abs(y) < boost period, the slope will be 0
@@ -173,5 +164,5 @@ def test_slope_cannot_equal_zero(alice, charlie, chain, crv, token_id, vecrv, ve
     chain.mine(timestamp=unlock_time - (WEEK + DAY))
     with brownie.reverts("dev: invalid slope"):
         veboost.extend_boost(
-            token_id(charlie.address, 0), 1, chain.time() + WEEK, 0, {"from": charlie}
+            veboost.get_token_id(alice, 0), 1, chain.time() + WEEK, 0, {"from": charlie}
         )

@@ -36,7 +36,6 @@ def test_extend_boost_grey_list_control(
     alice,
     bob,
     charlie,
-    token_id,
     cancel_time,
     expire_time,
     veboost,
@@ -54,7 +53,7 @@ def test_extend_boost_grey_list_control(
 
     expected_outcome = not (is_whitelist ^ status)
 
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     if expected_outcome is True:
         veboost.extend_boost(token, 10_000, expire_time, cancel_time, {"from": caller})
         assert math.isclose(veboost.token_boost(token), veboost.delegated_boost(alice))
@@ -71,7 +70,6 @@ def test_transferring_boost_grey_list_control(
     bob,
     charlie,
     dave,
-    token_id,
     veboost,
     is_whitelist,
     status,
@@ -87,7 +85,7 @@ def test_transferring_boost_grey_list_control(
 
     expected_outcome = not (is_whitelist ^ status)
 
-    token = token_id(alice.address, 0)
+    token = veboost.get_token_id(alice, 0)
     if expected_outcome is True:
         veboost.transferFrom(bob, dave, token, {"from": caller})
         assert veboost.received_boost(dave) > 0 and veboost.received_boost(bob) == 0

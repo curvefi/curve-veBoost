@@ -3,7 +3,7 @@ import math
 
 import brownie
 import pytest
-from brownie import ZERO_ADDRESS
+from brownie import ETH_ADDRESS, ZERO_ADDRESS
 
 pytestmark = pytest.mark.usefixtures("lock_alice")
 
@@ -93,3 +93,40 @@ def test_transferring_boost_grey_list_control(
 
     with brownie.reverts("dev: transfer boost not allowed"):
         veboost.transferFrom(bob, dave, token, {"from": caller})
+
+
+@pytest.mark.parametrize("is_whitelist,status,use_operator", it.product([False, True], repeat=3))
+def test_batch_set_delegation_status(alice, accounts, veboost, is_whitelist, status, use_operator):
+    caller = alice
+    if use_operator:
+        veboost.setApprovalForAll(accounts[1], True, {"from": alice})
+        caller = accounts[1]
+
+    delegators = [ZERO_ADDRESS] + accounts[2:]
+    statuses = [is_whitelist] + [status] * len(accounts[2:])
+
+    tx = veboost.batch_set_delegation_status(
+        alice,
+        delegators + [ETH_ADDRESS] * (256 - len(delegators)),
+        statuses + [2] * (256 - len(statuses)),
+        {"from": caller},
+    )
+
+    with brownie.multicall(block_identifier=tx.block_number):
+        results = [veboost.grey_list(alice, delegator) for delegator in delegators]
+
+    assert all(map(lambda p: p[0] == p[1], zip(statuses, results)))
+    assert veboost.grey_list(alice, ETH_ADDRESS) is False
+
+
+def test_batch_set_delegation_status_only_owner_operator(alice, accounts, bob, veboost):
+    delegators = [ZERO_ADDRESS] + accounts[2:]
+    statuses = [False] + [True] * len(accounts[2:])
+
+    with brownie.reverts("dev: only receiver or operator"):
+        veboost.batch_set_delegation_status(
+            alice,
+            delegators + [ETH_ADDRESS] * (256 - len(delegators)),
+            statuses + [2] * (256 - len(statuses)),
+            {"from": bob},
+        )

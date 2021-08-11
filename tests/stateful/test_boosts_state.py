@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import Tuple
 
-from brownie import chain, convert
+from brownie import accounts, chain, convert
 from brownie.network.account import Account
 
 DAY = 86400
@@ -61,19 +61,31 @@ class Line:
         return self
 
 
+class Token(Line):
+    def __init__(self, cancel_time: int, receiver: Account = None, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.cancel_time = cancel_time
+        self.receiver = receiver
+
+    @classmethod
+    def from_two_points(cls, cancel_time: int, receiver: int, *args, **kwargs) -> "Line":
+        return cls(cancel_time, receiver, *args, **kwargs)
+
+
 class _State:
     def __init__(self) -> None:
         self.balances = defaultdict(lambda: Line(0, 0))
         self.delegated = defaultdict(lambda: Line(0, 0))
         self.received = defaultdict(lambda: Line(0, 0))
-        self.tokens = defaultdict(lambda: Line(0, 0))
+        self.tokens = defaultdict(lambda: Token(0, None, 0, 0))
 
     @staticmethod
     def get_token_id(delegator: Account, _id: int) -> int:
         return (convert.to_uint(delegator.address) << 96) + _id
 
-    def get_delegator(token_id: int):
-        return convert.to_address(convert.to_bytes(token_id >> 96))
+    @staticmethod
+    def get_delegator(token_id: int) -> Account:
+        return accounts.at(convert.to_address(convert.to_bytes(token_id >> 96)))
 
     def create_boost(
         self,
@@ -103,4 +115,55 @@ class _State:
 
         self.delegated[delegator] += line
         self.received[receiver] += line
-        self.tokens[self.get_token_id(delegator, _id)] += line
+        self.tokens[self.get_token_id(delegator, _id)] = Token(0, receiver, line.slope, line.bias)
+
+    def extend_boost(self, token_id: int, percentage: int, expire_time: int, cancel_time: int):
+        delegator = self.get_delegator(token_id)
+        now = chain.time()
+
+        assert 0 < percentage <= 10_000
+        assert cancel_time <= expire_time <= self.balances[delegator].get_x(0)
+        assert expire_time - now >= WEEK
+        assert token_id < 2 ** 96
+
+        token = self.tokens[token_id]
+
+        assert expire_time >= token.get_x(0)
+        if cancel_time < token.cancel_time:
+            assert now >= token.get_x(0)
+
+        dline = self.delegated[delegator] - token
+        rline = self.received[token.receiver] - token
+
+        balance = self.balances[delegator].get_y(now)
+        delegated = dline.get_y(now)
+        assert delegated >= 0
+
+        y = percentage * (balance - delegated) // 10_000
+        assert y > 0
+
+        assert y >= token.get_y(now)
+
+        new_token = Token.from_two_points(token.receiver, cancel_time, (now, y), (expire_time, 0))
+
+        assert new_token.slope < 0
+
+        self.delegated[delegator] = dline + new_token
+        self.received[token.receiver] = rline + new_token
+        self.tokens[token_id] = new_token
+
+    def cancel_boost(self, token_id: int):
+        delegator = self.get_delegator(token_id)
+        token = self.tokens[token_id]
+
+        self.delegated[delegator] -= token
+        self.received[token.receiver] -= token
+        self.tokens[token_id] = Token(0, None, 0, 0)
+
+    def transfer_boost(self, _from: Account, _to: Account, token_id: int):
+        token = self.tokens[token_id]
+
+        assert _from == token.receiver
+
+        self.received[_from] -= token
+        self.received[_to] += token

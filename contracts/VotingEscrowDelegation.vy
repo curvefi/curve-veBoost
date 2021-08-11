@@ -792,6 +792,18 @@ def calc_boost_bias_slope(
     return bias, slope
 
 
+@pure
+@external
+def get_token_id(_delegator: address, _id: uint256) -> uint256:
+    """
+    @notice Simple method to get the token id's mintable by a delegator
+    @param _delegator The address of the delegator
+    @param _id The id value, must be less than 2 ** 96
+    """
+    assert _id < 2 ** 96  # dev: invalid _id
+    return shift(convert(_delegator, uint256), 96) + _id
+
+
 @external
 def commit_transfer_ownership(_addr: address):
     """

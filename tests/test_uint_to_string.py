@@ -1,3 +1,4 @@
+import hypothesis
 from brownie.test import given, strategy
 
 
@@ -27,6 +28,7 @@ def test_python_version(value):
     assert uint_to_string(value) == str(value)
 
 
+@hypothesis.settings(max_examples=512)
 @given(value=strategy("uint256"))
 def test_veboost_version(value, veboost):
     assert veboost.uint_to_string(value) == str(value)

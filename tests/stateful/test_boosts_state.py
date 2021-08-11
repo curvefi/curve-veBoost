@@ -3,6 +3,7 @@ from typing import Tuple
 
 from brownie import accounts, chain, convert
 from brownie.network.account import Account
+from brownie.test import strategy
 
 DAY = 86400
 WEEK = DAY * 7
@@ -74,7 +75,6 @@ class Token(Line):
 
 class _State:
     def __init__(self) -> None:
-        self.balances = defaultdict(lambda: Line(0, 0))
         self.delegated = defaultdict(lambda: Line(0, 0))
         self.received = defaultdict(lambda: Line(0, 0))
         self.tokens = defaultdict(lambda: Token(0, None, 0, 0))
@@ -89,6 +89,8 @@ class _State:
 
     def create_boost(
         self,
+        vecrv_balance: int,
+        lock_end: int,
         delegator: Account,
         receiver: Account,
         percentage: int,
@@ -99,11 +101,11 @@ class _State:
         now = chain.time()
 
         assert 0 < percentage <= 10_000
-        assert cancel_time <= expire_time <= self.balances[delegator].get_x(0)
+        assert cancel_time <= expire_time <= lock_end
         assert expire_time - now >= WEEK
         assert _id < 2 ** 96
 
-        balance = self.balances[delegator].get_y(now)
+        balance = vecrv_balance
         delegated = self.delegated[delegator].get_y(now)
         assert delegated >= 0
 
@@ -117,12 +119,20 @@ class _State:
         self.received[receiver] += line
         self.tokens[self.get_token_id(delegator, _id)] = Token(0, receiver, line.slope, line.bias)
 
-    def extend_boost(self, token_id: int, percentage: int, expire_time: int, cancel_time: int):
+    def extend_boost(
+        self,
+        vecrv_balance: int,
+        lock_end: int,
+        token_id: int,
+        percentage: int,
+        expire_time: int,
+        cancel_time: int,
+    ):
         delegator = self.get_delegator(token_id)
         now = chain.time()
 
         assert 0 < percentage <= 10_000
-        assert cancel_time <= expire_time <= self.balances[delegator].get_x(0)
+        assert cancel_time <= expire_time <= lock_end
         assert expire_time - now >= WEEK
         assert token_id < 2 ** 96
 
@@ -135,7 +145,7 @@ class _State:
         dline = self.delegated[delegator] - token
         rline = self.received[token.receiver] - token
 
-        balance = self.balances[delegator].get_y(now)
+        balance = vecrv_balance
         delegated = dline.get_y(now)
         assert delegated >= 0
 
@@ -167,3 +177,48 @@ class _State:
 
         self.received[_from] -= token
         self.received[_to] += token
+
+
+class StateMachine:
+
+    lock_amount = strategy("uint80", min_value=10 ** 18)
+    lock_timedelta = strategy("uint32", max_value=DAY * 365 * 4 - 1, min_value=WEEK)
+    account = strategy("address")
+
+    def __init__(cls, accounts, crv, vecrv, veboost) -> None:
+        cls.accounts = accounts
+        cls.crv = crv
+        cls.vecrv = vecrv
+        cls.veboost = veboost
+
+    def setup(self):
+
+        total_supply = self.crv.balanceOf(accounts[0])
+        amount = total_supply // 10
+
+        self.state = _State()
+
+        for account in self.accounts:
+            self.crv.transfer(account, amount, {"from": accounts[0]})
+            self.crv.approve(self.vecrv, 2 ** 256 - 1, {"from": account})
+
+    def initialize_lock_half(self):
+        for account in self.accounts[:5]:
+            length = ((chain.time() + DAY * 365 * 4) // WEEK) * WEEK
+            self.vecrv.create_lock(self.crv.balanceOf(account), length, {"from": account})
+
+    def rule_lock_crv(self, account, lock_amount, lock_timedelta):
+        if self.crv.balanceOf(account) < lock_amount:
+            return
+
+        lock_end = self.vecrv.locked__end(account)
+        now = chain.time()
+        if lock_end <= now:
+            # no existing lock or previous lock expired
+            if lock_end:
+                self.vecrv.withdraw({"from": account})
+            self.vecrv.create_lock(lock_amount, now + lock_timedelta, {"from": account})
+
+
+def test_state(state_machine, accounts, crv, vecrv, veboost):
+    state_machine(StateMachine, accounts, crv, vecrv, veboost)

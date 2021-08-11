@@ -25,3 +25,8 @@ def uint_to_string(value: int) -> str:
 @given(value=strategy("uint256"))
 def test_python_version(value):
     assert uint_to_string(value) == str(value)
+
+
+@given(value=strategy("uint256"))
+def test_veboost_version(value, veboost):
+    assert veboost.uint_to_string(value) == str(value)

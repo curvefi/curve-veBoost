@@ -1,4 +1,11 @@
+from collections import defaultdict
 from typing import Tuple
+
+from brownie import chain, convert
+from brownie.network.account import Account
+
+DAY = 86400
+WEEK = DAY * 7
 
 
 class Line:
@@ -52,3 +59,48 @@ class Line:
         self.slope -= other.slope
         self.bias -= other.bias
         return self
+
+
+class _State:
+    def __init__(self) -> None:
+        self.balances = defaultdict(lambda: Line(0, 0))
+        self.delegated = defaultdict(lambda: Line(0, 0))
+        self.received = defaultdict(lambda: Line(0, 0))
+        self.tokens = defaultdict(lambda: Line(0, 0))
+
+    @staticmethod
+    def get_token_id(delegator: Account, _id: int) -> int:
+        return (convert.to_uint(delegator.address) << 96) + _id
+
+    def get_delegator(token_id: int):
+        return convert.to_address(convert.to_bytes(token_id >> 96))
+
+    def create_boost(
+        self,
+        delegator: Account,
+        receiver: Account,
+        percentage: int,
+        cancel_time: int,
+        expire_time: int,
+        _id: int,
+    ) -> None:
+        now = chain.time()
+
+        assert 0 < percentage <= 10_000
+        assert cancel_time <= expire_time <= self.balances[delegator].get_x(0)
+        assert expire_time - now >= WEEK
+        assert _id < 2 ** 96
+
+        balance = self.balances[delegator].get_y(now)
+        delegated = self.delegated[delegator].get_y(now)
+        assert delegated >= 0
+
+        y = percentage * (balance - delegated) // 10_000
+        assert y > 0
+
+        line = Line.from_two_points((now, y), (expire_time, 0))
+        assert line.slope < 0
+
+        self.delegated[delegator] += line
+        self.received[receiver] += line
+        self.tokens[self.get_token_id(delegator, _id)] += line

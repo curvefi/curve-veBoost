@@ -595,7 +595,7 @@ def batch_set_delegation_status(_receiver: address, _delegators: address[256], _
         if the value is not 0 or 1, execution will break, effectively stopping at the index.
 
     """
-    assert msg.sender == _receiver or self.isApprovedForAll[_receiver][msg.sender]
+    assert msg.sender == _receiver or self.isApprovedForAll[_receiver][msg.sender]  # dev: only receiver or operator
 
     for i in range(256):
         if _status[i] > 1:

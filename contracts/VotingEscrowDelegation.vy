@@ -344,8 +344,10 @@ def transferFrom(_from: address, _to: address, _token_id: uint256):
 
 @view
 @external
-def tokenURI(_token_id: uint256) -> String[2]:
-    return ""
+def tokenURI(_token_id: uint256) -> String[128]:
+    # TODO: add api endpoint to curvefi/curve-api
+    # TODO: concatenetate token_id to end of URL
+    return "https://api.curve.fi/api/veboost/"
 
 
 @external

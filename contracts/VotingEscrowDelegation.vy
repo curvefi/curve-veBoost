@@ -252,7 +252,7 @@ def _cancel_boost(_token_id: uint256, _caller: address):
     if not (_caller == receiver or self.isApprovedForAll[receiver][_caller] or tvalue < 0):
         if _caller == delegator or self.isApprovedForAll[delegator][_caller]:
             # if delegator or operator, wait till after cancel time
-            assert token.cancel_time <= block.timestamp
+            assert token.cancel_time <= block.timestamp  # dev: must wait for cancel time
         else:
             # All others are disallowed
             raise "Not allowed!"

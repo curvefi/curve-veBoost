@@ -78,6 +78,7 @@ struct Token:
     cancel_time: uint256
 
 
+IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
 MIN_DELEGATION_TIME: constant(uint256) = 86400 * 7
 #@ if mode == "test":
@@ -287,13 +288,17 @@ def _uint_to_string(_value: uint256) -> String[78]:
         if i == 77 and digits == 0:
             digits = 78
 
-    identity: address = 0x0000000000000000000000000000000000000004
-
-    for i in range(0, 78):
+    # go backwards from the end to start
+    for i in range(78):
         power: int128 = 77 - i
         value: uint256 = ((_value / 10 ** convert(power, uint256)) % 10) + 48
         char: Bytes[1] = slice(convert(value, bytes32), 31, 1)
-        buffer = raw_call(identity, concat(buffer, char), max_outsize=78, is_static_call=True)
+        buffer = raw_call(
+            IDENTITY_PRECOMPILE,
+            concat(buffer, char),
+            max_outsize=78,
+            is_static_call=True
+        )
 
     return convert(slice(buffer, 78 - digits, digits), String[78])
 

@@ -581,7 +581,7 @@ def set_delegation_status(_receiver: address, _delegator: address, _status: bool
 
 
 @external
-def batch_set_delegation_status(_receiver: address, _delegators: address[256], _status: bool[256], _stop_idx: uint256):
+def batch_set_delegation_status(_receiver: address, _delegators: address[256], _status: uint256[256]):
     """
     @notice Set or reaffirm the blacklist/whitelist status of multiple delegators for a receiver.
     @dev Setting delegator as the ZERO_ADDRESS enables users to deactive delegations globally
@@ -589,15 +589,16 @@ def batch_set_delegation_status(_receiver: address, _delegators: address[256], _
         is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][ZERO_ADDRESS]).
     @param _receiver The account which we will be updating it's list
     @param _delegators List of 256 accounts to disallow/allow delegations from
-    @param _status List of 256 booleans of the status to set the _delegator_i account to
+    @param _status List of 256 0s and 1s (booleans) of the status to set the _delegator_i account to.
+        if the value is not 0 or 1, execution will break, effectively stopping at the index.
+
     """
     assert msg.sender == _receiver or self.isApprovedForAll[_receiver][msg.sender]
-    assert _stop_idx <= 256
 
     for i in range(256):
-        if i == _stop_idx:
+        if _status[i] > 1:
             break
-        self._set_delegation_status(_receiver, _delegators[i], _status[i])
+        self._set_delegation_status(_receiver, _delegators[i], convert(_status[i], bool))
 
 
 @view

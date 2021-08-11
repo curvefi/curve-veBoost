@@ -272,6 +272,8 @@ def _set_delegation_status(_receiver: address, _delegator: address, _status: boo
 @pure
 @internal
 def _uint_to_string(_value: uint256) -> String[78]:
+    # NOTE: Odd that this works with a raw_call inside, despite being marked
+    # a pure function
     if _value == 0:
         return "0"
 

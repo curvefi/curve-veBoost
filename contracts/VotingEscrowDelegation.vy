@@ -269,6 +269,31 @@ def _set_delegation_status(_receiver: address, _delegator: address, _status: boo
     log GreyListUpdated(_receiver, _delegator, _status)
 
 
+@pure
+@internal
+def _uint_to_string(_value: uint256) -> String[78]:
+    if _value == 0:
+        return "0"
+
+    buffer: Bytes[78] = b""
+    digits: uint256 = 0
+
+    for i in range(1, 79):
+        if _value / 10 ** i == 0:
+            digits = i
+            break
+
+    identity: address = 0x0000000000000000000000000000000000000004
+
+    for i in range(0, 78):
+        power: int128 = 77 - i
+        value: uint256 = (_value / 10 ** convert(power, uint256)) % 10
+        char: Bytes[1] = slice(convert(value, bytes32), 31, 1)
+        buffer = raw_call(identity, concat(buffer, char), max_outsize=78, is_static_call=True)
+
+    return convert(slice(buffer, 78 - digits, digits), String[78])
+
+
 @external
 def approve(_approved: address, _token_id: uint256):
     """
@@ -387,6 +412,13 @@ def _mint_for_testing(_to: address, _token_id: uint256):
 @external
 def _burn_for_testing(_token_id: uint256):
     self._burn(_token_id)
+
+
+@view
+@external
+def uint_to_string(_value: uint256) -> String[78]:
+    return self._uint_to_string(_value)
+
 #@ endif
 
 

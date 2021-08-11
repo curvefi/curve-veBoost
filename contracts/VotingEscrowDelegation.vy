@@ -281,17 +281,14 @@ def _uint_to_string(_value: uint256) -> String[78]:
         return "0"
 
     buffer: Bytes[78] = b""
-    digits: uint256 = 0
+    digits: uint256 = 78
 
     for i in range(78):
-        if _value / 10 ** i == 0:
-            digits = i
-            break
-        if i == 77 and digits == 0:
-            digits = 78
+        # go forward to find the # of digits, and set it
+        # only if we have found the last index
+        if digits == 78 and _value / 10 ** convert(i, uint256) == 0:
+            digits = convert(i, uint256)
 
-    # go backwards from the end to start
-    for i in range(78):
         power: int128 = 77 - i
         value: uint256 = ((_value / 10 ** convert(power, uint256)) % 10) + 48
         char: Bytes[1] = slice(convert(value, bytes32), 31, 1)

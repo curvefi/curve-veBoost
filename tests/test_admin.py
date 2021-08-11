@@ -42,3 +42,16 @@ def test_set_killed_guarded(bob, veboost):
 
     with brownie.reverts():
         veboost.set_killed(False, {"from": bob})
+
+
+def test_set_base_uri(alice, veboost):
+    veboost.set_base_uri("https://api.curve.fi/api/getveboost?token_id=", {"from": alice})
+
+    # test max length
+    with brownie.reverts():
+        veboost.set_base_uri("a" * 129, {"from": alice})
+
+
+def test_set_base_uri_guarded(bob, veboost):
+    with brownie.reverts():
+        veboost.set_base_uri("https://api.curve.fi/api/getveboost?token_id=", {"from": bob})

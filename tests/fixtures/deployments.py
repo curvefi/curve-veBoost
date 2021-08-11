@@ -21,7 +21,7 @@ def veboost(alice, VotingEscrowDelegation, vecrv):
     source = source.replace(ZERO_ADDRESS, vecrv.address)
 
     NewVotingEscrowDelegation = compile_source(source).Vyper
-    return NewVotingEscrowDelegation.deploy("Curve veCRV Boost", "veCRV-Boost", {"from": alice})
+    return NewVotingEscrowDelegation.deploy("Curve veCRV Boost", "veCRV-Boost", "", {"from": alice})
 
 
 @pytest.fixture(scope="session", autouse=True)

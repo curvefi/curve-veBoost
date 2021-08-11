@@ -95,6 +95,7 @@ ownerOf: public(HashMap[uint256, address])
 
 name: public(String[32])
 symbol: public(String[32])
+base_uri: public(String[128])
 
 boost: HashMap[address, Boost]
 boost_token: HashMap[uint256, Token]
@@ -115,9 +116,10 @@ grey_list: public(HashMap[address, HashMap[address, bool]])
 
 
 @external
-def __init__(_name: String[32], _symbol: String[32]):
+def __init__(_name: String[32], _symbol: String[32], _base_uri: String[128]):
     self.name = _name
     self.symbol = _symbol
+    self.base_uri = _base_uri
 
     self.admin = msg.sender
 
@@ -380,10 +382,8 @@ def transferFrom(_from: address, _to: address, _token_id: uint256):
 
 @view
 @external
-def tokenURI(_token_id: uint256) -> String[128]:
-    # TODO: add api endpoint to curvefi/curve-api
-    # TODO: concatenetate token_id to end of URL
-    return "https://api.curve.fi/api/veboost/"
+def tokenURI(_token_id: uint256) -> String[256]:
+    return concat(self.base_uri, self._uint_to_string(_token_id))
 
 
 @external
@@ -878,3 +878,9 @@ def set_killed(_killed: bool):
     """
     assert msg.sender == self.admin
     self.is_killed = _killed
+
+
+@external
+def set_base_uri(_base_uri: String[128]):
+    assert msg.sender == self.admin
+    self.base_uri = _base_uri

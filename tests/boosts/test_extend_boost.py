@@ -112,3 +112,66 @@ def test_outstanding_negative_boosts_prevent_extending_boosts(
         veboost.extend_boost(
             token_id(alice.address, 0), 7_000, expire_time, cancel_time, {"from": alice}
         )
+
+
+def test_no_boost_available_to_extend_with(
+    alice,
+    charlie,
+    chain,
+    token_id,
+    veboost,
+    alice_unlock_time,
+):
+    # TODO: how to make this test not fail so often?
+    # need someway to make a transaction execute at an exact timestamp
+
+    token = token_id(alice.address, 0)
+    token_expiry = veboost.token_expiry(token)
+
+    # fast forward to when the boost expires
+    chain.mine(timestamp=token_expiry)
+
+    # sometimes we get a little ganache jitter and this will hit
+    # but essentially we want to know that the value of the token is
+    # 0 and only 0
+    assert veboost.token_boost(token) == 0
+
+    # give charlie our remaining boost, which is actually 100% of our vecrv
+    # since token 0 is valued at 0 boost
+    veboost.create_boost(alice, charlie, 10_000, 0, alice_unlock_time, 1, {"from": alice})
+
+    # forward in time some more
+    chain.mine(timestamp=alice_unlock_time - WEEK - DAY)
+
+    # we try to extend token 0, but after removing it's negative effect
+    # it turns out we have no boost left to give, since token 1 has it all
+    with brownie.reverts("dev: no boost"):
+        veboost.extend_boost(token, 7_000, alice_unlock_time, 0, {"from": alice})
+
+
+def test_extension_cannot_result_in_a_lesser_value(
+    alice, token_id, expire_time, cancel_time, veboost
+):
+    token = token_id(alice.address, 0)
+    with brownie.reverts("dev: cannot reduce value of boost"):
+        veboost.extend_boost(token, 2_000, expire_time, cancel_time, {"from": alice})
+
+
+def test_slope_cannot_equal_zero(alice, charlie, chain, crv, token_id, vecrv, veboost):
+    # slope can be equal to 0 due to integer division, as the
+    # amount of boost we are delegating is divided by the length of the
+    # boost period, in which case if abs(y) < boost period, the slope will be 0
+    amount = (DAY * 365 * 4 // WEEK) * WEEK  # very small amount
+    unlock_time = ((chain.time() + amount) // WEEK) * WEEK
+    crv.transfer(charlie, amount * 10, {"from": alice})
+    crv.approve(vecrv, amount * 10, {"from": charlie})
+    vecrv.create_lock(amount * 10, unlock_time, {"from": charlie})
+    # this should work and be okeay
+    veboost.create_boost(charlie, alice, 10_000, 0, chain.time() + WEEK, 0, {"from": charlie})
+
+    # fast forward to when we have very little boost left
+    chain.mine(timestamp=unlock_time - (WEEK + DAY))
+    with brownie.reverts("dev: invalid slope"):
+        veboost.extend_boost(
+            token_id(charlie.address, 0), 1, chain.time() + WEEK, 0, {"from": charlie}
+        )

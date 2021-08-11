@@ -765,6 +765,8 @@ def token_expiry(_token_id: uint256) -> uint256:
     tbias: int256 = 0
     tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
     # y = mx + b -> (y - b) / m = x -> (0 - b)/m = x
+    if tslope == 0:
+        return 0
     return convert(-tbias/tslope, uint256)
 
 

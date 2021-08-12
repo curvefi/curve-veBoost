@@ -98,7 +98,7 @@ symbol: public(String[32])
 base_uri: public(String[128])
 
 boost: HashMap[address, Boost]
-boost_token: HashMap[uint256, Token]
+boost_tokens: HashMap[uint256, Token]
 
 admin: public(address)  # Can and will be a smart contract
 future_admin: public(address)
@@ -173,7 +173,7 @@ def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated += data
     self.boost[_receiver].received += data
-    self.boost_token[_token_id] = Token({data: data, cancel_time: _cancel_time})
+    self.boost_tokens[_token_id] = Token({data: data, cancel_time: _cancel_time})
 
 
 @internal
@@ -181,7 +181,7 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated -= data
     self.boost[_receiver].received -= data
-    self.boost_token[_token_id] = empty(Token)
+    self.boost_tokens[_token_id] = empty(Token)
 
 
 @internal
@@ -225,7 +225,7 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
 
     tbias: int256 = 0
     tslope: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
 
     tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
 
@@ -247,7 +247,7 @@ def _cancel_boost(_token_id: uint256, _caller: address):
     receiver: address = self.ownerOf[_token_id]
     delegator: address = convert(shift(_token_id, -96), address)
 
-    token: Token = self.boost_token[_token_id]
+    token: Token = self.boost_tokens[_token_id]
     tslope: int256 = 0
     tbias: int256 = 0
     tbias, tslope = self._deconstruct_bias_slope(token.data)
@@ -392,7 +392,7 @@ def burn(_token_id: uint256):
     """
     assert self._is_approved_or_owner(msg.sender, _token_id)  # dev: neither owner nor approved
 
-    tdata: uint256 = self.boost_token[_token_id].data
+    tdata: uint256 = self.boost_tokens[_token_id].data
     if tdata != 0:
         tslope: int256 = 0
         tbias: int256 = 0
@@ -518,7 +518,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(delegator)
-    token: Token = self.boost_token[_token_id]
+    token: Token = self.boost_tokens[_token_id]
 
     assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
     assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
@@ -743,7 +743,7 @@ def token_boost(_token_id: uint256) -> int256:
     """
     tslope: int256 = 0
     tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
     time: int256 = convert(block.timestamp, int256)
     return tslope * time + tbias
 
@@ -759,7 +759,7 @@ def token_expiry(_token_id: uint256) -> uint256:
     """
     tslope: int256 = 0
     tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_token[_token_id].data)
+    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
     # y = mx + b -> (y - b) / m = x -> (0 - b)/m = x
     if tslope == 0:
         return 0
@@ -776,7 +776,7 @@ def token_cancel_time(_token_id: uint256) -> uint256:
         after it's expiration.
     @param _token_id The token id to query
     """
-    return self.boost_token[_token_id].cancel_time
+    return self.boost_tokens[_token_id].cancel_time
 
 
 @view
@@ -816,7 +816,7 @@ def calc_boost_bias_slope(
     if _extend_token_id < 2 ** 96 and convert(shift(_extend_token_id, -96), address) == _delegator:
         # decrease the delegated bias and slope by the token's bias and slope
         # only if it is the delegator's and it is within the bounds of existence
-        ddata -= self.boost_token[_extend_token_id].data
+        ddata -= self.boost_tokens[_extend_token_id].data
 
     dbias: int256 = 0
     dslope: int256 = 0

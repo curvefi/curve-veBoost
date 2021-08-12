@@ -387,6 +387,65 @@ class StateMachine:
                 True,
             )
 
+    def rule_extend_boost(
+        self,
+        pct: int,
+        delegator: Account = "account",
+        _id: int = "token_id",
+        expire_time="timedelta",
+        cancel_time="timedelta",
+    ):
+        token_id = self.state.get_token_id(delegator, _id)
+        if token_id not in self.state.boost_tokens:
+            assert self.veboost.ownerOf(token_id) == ZERO_ADDRESS
+            return
+
+        with brownie.multicall(block_identifier=chain.height):
+            vecrv_balance = self.vecrv.balanceOf(delegator)
+            lock_expiry = self.vecrv.locked__end(delegator)
+
+        try:
+            self.state.extend_boost(
+                token_id,
+                pct,
+                int(chain.time() + expire_time),
+                int(chain.time() + cancel_time),
+                int(chain.time()),
+                vecrv_balance,
+                lock_expiry,
+            )
+        except AssertionError:
+            with brownie.reverts():
+                self.veboost.extend_boost(
+                    token_id,
+                    pct,
+                    int(chain.time() + expire_time),
+                    int(chain.time() + cancel_time),
+                    {"from": self.state.boost_tokens[token_id].delegator},
+                )
+        else:
+            tx = self.veboost.extend_boost(
+                token_id,
+                pct,
+                int(chain.time() + expire_time),
+                int(chain.time() + cancel_time),
+                {"from": self.state.boost_tokens[token_id].delegator},
+            )
+            with brownie.multicall(block_identifier=tx.block_number):
+                vecrv_balance = self.vecrv.balanceOf(delegator)
+                lock_expiry = self.vecrv.locked__end(delegator)
+
+            self.state.extend_boost(
+                token_id,
+                pct,
+                int(tx.timestamp + expire_time),
+                int(tx.timestamp + cancel_time),
+                tx.timestamp,
+                vecrv_balance,
+                lock_expiry,
+                True,
+            )
+
     def rule_advance_time(self):
         chain.mine(timedelta=2 * WEEK)
 

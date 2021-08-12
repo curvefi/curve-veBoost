@@ -1,8 +1,12 @@
+import math
 from collections import defaultdict
 from typing import DefaultDict
 
-from brownie import ZERO_ADDRESS, convert
-from brownie.network.account import Account
+import brownie
+from brownie import ZERO_ADDRESS, chain, convert
+from brownie.network.account import Account, Accounts
+from brownie.network.contract import Contract
+from brownie.test import strategy
 from dataclassy import dataclass
 
 DAY = 86400
@@ -282,6 +286,118 @@ class ContractState:
                 self.boost_tokens[token_id].bias = 0
                 self.boost_tokens[token_id].owner = _to
 
+    def adjusted_balance_of(self, account: Account, timestamp: int, vecrv_balance: int) -> int:
+        delegated = self.boost[account].delegated(timestamp)
+        received = self.boost[account].received(timestamp)
+        balance = vecrv_balance - abs(delegated) + max(received, 0)
+        return max(balance, 0)
+
     @staticmethod
     def get_token_id(account: str, _id: int) -> int:
         return (convert.to_uint(account) << 96) + _id
+
+
+class StateMachine:
+
+    account = strategy("address")
+    token_id = strategy("uint128")
+    timedelta = strategy(
+        "uint32", min_value=int(chain.time()), max_value=int(chain.time()) + 40 * YEAR
+    )
+    pct = strategy("int16", min_value=-1, max_value=10_001)
+
+    def __init__(
+        cls, accounts: Accounts, crv: Contract, vecrv: Contract, veboost: Contract
+    ) -> None:
+        cls.accounts = accounts
+        cls.crv = crv
+        cls.vecrv = vecrv
+        cls.veboost = veboost
+
+        # available throughout all the test runs
+        brownie.multicall.deploy({"from": accounts[0]})
+
+    def setup(self) -> None:
+        total_supply = self.crv.balanceOf(self.accounts[0])
+        amount = total_supply // len(self.accounts)
+        for account in self.accounts:
+            self.crv.transfer(account, amount, {"from": self.accounts[0]})
+            self.crv.approve(self.vecrv, 2 ** 256 - 1, {"from": account})
+
+        self.state = ContractState()
+
+    def initialize(self):
+        # lock up half of each accounts balance for 2 years
+        for account in self.accounts:
+            self.vecrv.create_lock(
+                self.crv.balanceOf(account), chain.time() + 2 * YEAR, {"from": account}
+            )
+
+    def rule_create_boost(
+        self,
+        percentage: int = "pct",
+        cancel_time: int = "timedelta",
+        expire_time: int = "timedelta",
+        _id: int = "token_id",
+        delegator: Account = "account",
+        receiver: Account = "account",
+    ):
+        with brownie.multicall(block_identifier=chain.height):
+            vecrv_balance = self.vecrv.balanceOf(delegator)
+            lock_expiry = self.vecrv.locked__end(delegator)
+
+        try:
+            self.state.create_boost(
+                delegator,
+                receiver,
+                percentage,
+                cancel_time,
+                expire_time,
+                _id,
+                int(chain.time()),
+                vecrv_balance,
+                lock_expiry,
+            )
+        except AssertionError:
+            with brownie.reverts():
+                self.veboost.create_boost(
+                    delegator,
+                    receiver,
+                    percentage,
+                    cancel_time,
+                    expire_time,
+                    _id,
+                    {"from": delegator},
+                )
+        else:
+            tx = self.veboost.create_boost(
+                delegator, receiver, percentage, cancel_time, expire_time, _id, {"from": delegator}
+            )
+            with brownie.multicall(block_identifier=tx.block_number):
+                vecrv_balance = self.vecrv.balanceOf(delegator)
+                lock_expiry = self.vecrv.locked__end(delegator)
+            self.state.create_boost(
+                delegator,
+                receiver,
+                percentage,
+                cancel_time,
+                expire_time,
+                _id,
+                tx.timestamp,
+                vecrv_balance,
+                lock_expiry,
+            )
+
+    def invariant_adjusted_balance(self):
+        for account in self.accounts:
+            with brownie.multicall(block_identifier=chain.height):
+                vecrv_balance = self.vecrv.balanceOf(account)
+                timestamp = brownie.multicall._contract.getCurrentBlockTimestamp()
+                adj_balance = self.veboost.adjusted_balance_of(account)
+
+            assert math.isclose(
+                adj_balance,
+                self.state.adjusted_balance_of(account, timestamp, vecrv_balance),
+                rel_tol=0.0001,
+                abs_tol=100_000,
+            )

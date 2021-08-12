@@ -1,8 +1,13 @@
 from collections import defaultdict
 from typing import DefaultDict
 
+from brownie import convert
 from brownie.network.account import Account
 from dataclassy import dataclass
+
+DAY = 86400
+WEEK = DAY * 7
+YEAR = DAY * 365
 
 
 @dataclass(slots=True, iter=True)
@@ -150,8 +155,34 @@ class ContractState:
         _id: int,
         timestamp: int,
         vecrv_balance: int,
+        lock_expiry: int,
     ):
-        pass
+        assert 0 < percentage < 10_000  # percentage within bounds
+        assert cancel_time <= expire_time  # cancel time before expire time
+        assert expire_time >= timestamp + WEEK  # expire time greater than min delegation time
+        assert expire_time <= lock_expiry  # expire time less than lock expiry
+        assert _id < 2 ** 96  # id with bounds
+
+        delegated_boost: int = self.boost[delegator].delegated(timestamp)
+        assert delegated_boost > 0  # no outstanding negative boosts
+
+        y = percentage * (vecrv_balance - delegated_boost) // 10_000
+        assert y > 0
+
+        token: Token = Token.from_two_points((timestamp, y), (expire_time, 0))
+        assert token.slope < 0
+
+        token.delegator = delegator
+        token.owner = receiver
+        token.cancel_time = cancel_time
+
+        token_id: int = self.get_token_id(delegator.address, _id)
+        assert self.boost_tokens[token_id] == Token()
+
+        # modify state last
+        self.boost_tokens[token_id] = token
+        self.boost[delegator].delegated += token
+        self.boost[receiver].received += token
 
     def extend_boost(
         self,
@@ -169,3 +200,7 @@ class ContractState:
 
     def transfer_from(self, _from: Account, _to: Account, token_id: int):
         pass
+
+    @staticmethod
+    def get_token_id(account: str, _id: int) -> int:
+        return (convert.to_uint(account) << 96) + _id

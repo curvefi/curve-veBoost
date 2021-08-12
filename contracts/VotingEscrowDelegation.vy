@@ -104,6 +104,8 @@ admin: public(address)  # Can and will be a smart contract
 future_admin: public(address)
 is_killed: public(bool)
 
+totalSupply: public(uint256)
+
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist
 # gray_list[_receiver][_delegator]
@@ -149,6 +151,7 @@ def _burn(_token_id: uint256):
 
     self.balanceOf[owner] -= 1
     self.ownerOf[_token_id] = ZERO_ADDRESS
+    self.totalSupply -= 1
 
     log Transfer(owner, ZERO_ADDRESS, _token_id)
 
@@ -160,6 +163,7 @@ def _mint(_to: address, _token_id: uint256):
 
     self.balanceOf[_to] += 1
     self.ownerOf[_token_id] = _to
+    self.totalSupply += 1
 
     log Transfer(ZERO_ADDRESS, _to, _token_id)
 

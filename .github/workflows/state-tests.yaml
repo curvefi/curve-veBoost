@@ -1,4 +1,4 @@
-name: unitary
+name: stateful
 
 on: ["push", "pull_request"]
 

@@ -245,6 +245,7 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
 @internal
 def _cancel_boost(_token_id: uint256, _caller: address):
     receiver: address = self.ownerOf[_token_id]
+    assert receiver != ZERO_ADDRESS  # dev: token does not exist
     delegator: address = convert(shift(_token_id, -96), address)
 
     token: Token = self.boost_tokens[_token_id]
@@ -513,6 +514,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     receiver: address = self.ownerOf[_token_id]
 
     assert msg.sender == delegator or self.isApprovedForAll[delegator][msg.sender]  # dev: only delegator or operator
+    assert receiver != ZERO_ADDRESS  # dev: boost token does not exist
     assert _percentage > 0  # dev: percentage must be greater than 0 bps
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
 

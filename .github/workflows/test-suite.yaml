@@ -23,6 +23,7 @@ jobs:
           path: |
             ~/.solcx
             ~/.vvm
+            ~/.brownie
           key: compiler-cache
 
       - name: Setup Node.js

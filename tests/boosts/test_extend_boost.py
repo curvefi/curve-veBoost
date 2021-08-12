@@ -166,3 +166,9 @@ def test_slope_cannot_equal_zero(alice, charlie, chain, crv, vecrv, veboost):
         veboost.extend_boost(
             veboost.get_token_id(alice, 0), 1, chain.time() + WEEK, 0, {"from": charlie}
         )
+
+
+def test_cannot_extend_non_existent_boost(alice, veboost):
+    token = veboost.get_token_id(alice, 10)
+    with brownie.reverts("dev: boost token does not exist"):
+        veboost.extend_boost(token, 1, 0, 0, {"from": alice})

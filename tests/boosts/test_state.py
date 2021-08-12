@@ -118,6 +118,13 @@ class Token(Line):
     def from_two_points(cls, a: Point, b: Point) -> "Line":
         return cls(*super().from_two_points(a, b))
 
+    @property
+    def expire_time(self):
+        if self.slope == 0:
+            return 0
+        else:
+            return -self.bias // self.slope
+
     def __add__(self, other: "Token") -> "Token":
         return Token(*super().__add__(other))
 
@@ -156,11 +163,12 @@ class ContractState:
         timestamp: int,
         vecrv_balance: int,
         lock_expiry: int,
+        update_state: bool = False,
     ):
         assert 0 < percentage < 10_000  # percentage within bounds
-        assert cancel_time <= expire_time  # cancel time before expire time
+        # cancel time before expire time, expire time before lock expiry
+        assert cancel_time <= expire_time <= lock_expiry
         assert expire_time >= timestamp + WEEK  # expire time greater than min delegation time
-        assert expire_time <= lock_expiry  # expire time less than lock expiry
         assert _id < 2 ** 96  # id with bounds
 
         delegated_boost: int = self.boost[delegator].delegated(timestamp)
@@ -180,9 +188,10 @@ class ContractState:
         assert self.boost_tokens[token_id] == Token()
 
         # modify state last
-        self.boost_tokens[token_id] = token
-        self.boost[delegator].delegated += token
-        self.boost[receiver].received += token
+        if update_state:
+            self.boost_tokens[token_id] = token
+            self.boost[delegator].delegated += token
+            self.boost[receiver].received += token
 
     def extend_boost(
         self,
@@ -192,8 +201,44 @@ class ContractState:
         cancel_time: int,
         timestamp: int,
         vecrv_balance: int,
+        lock_expiry: int,
+        update_state: bool = False,
     ):
-        pass
+        assert 0 < percentage <= 10_000
+        assert cancel_time <= expire_time <= lock_expiry
+        assert expire_time >= timestamp + WEEK
+
+        token: Token = self.boost_tokens[token_id]
+        assert token.owner is not None
+
+        token_current_value: int = token(timestamp)
+        token_expiry: int = token.expire_time
+
+        assert expire_time >= token_expiry
+        if cancel_time < token.cancel_time:
+            assert timestamp >= token_expiry
+
+        delegated_boost: int = (self.boost[token.delegator].delegated - token)(timestamp)
+        assert delegated_boost > 0
+
+        y: int = percentage * (vecrv_balance - delegated_boost) // 10_000
+        assert y > 0
+        assert y >= token_current_value
+
+        new_token: Token = Token.from_two_points((timestamp, y), (expire_time, 0))
+        assert new_token.slope < 0
+
+        new_token.delegator = token.delegator
+        new_token.owner = token.owner
+        new_token.cancel_time = cancel_time
+
+        # modify state last
+        if update_state:
+            self.boost_tokens[token_id] = new_token
+            self.boost[token.delegator].delegated -= token
+            self.boost[token.delegator].delegated += new_token
+            self.boost[token.owner].received -= token
+            self.boost[token.owner].received += new_token
 
     def cancel_boost(self, token_id: int):
         pass

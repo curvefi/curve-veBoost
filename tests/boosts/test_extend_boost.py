@@ -102,7 +102,7 @@ def test_outstanding_negative_boosts_prevent_extending_boosts(
     # give charlie our remaining boost
     veboost.create_boost(alice, charlie, 10_000, 0, chain.time() + WEEK, 1, {"from": alice})
     # fast forward to a day the boost given to charlie has expired
-    chain.mine(timestamp=expire_time - WEEK)
+    chain.mine(timestamp=expire_time - (WEEK + DAY))
 
     with brownie.reverts(dev_revert_msg="dev: outstanding negative boosts"):
         veboost.extend_boost(

@@ -249,7 +249,7 @@ class ContractState:
     ):
         token: Token = self.boost_tokens[token_id]
         assert token.owner is not None
-        if caller == token.owner:
+        if caller != token.owner:
             if caller == token.delegator:
                 assert timestamp >= token.cancel_time
             else:
@@ -329,7 +329,6 @@ class StateMachine:
     def rule_create_boost(
         self,
         percentage: int = "pct",
-        cancel_time: int = "timedelta",
         expire_time: int = "timedelta",
         delegator: Account = "account",
         receiver: Account = "account",
@@ -393,7 +392,6 @@ class StateMachine:
         self,
         pct: int,
         expire_time="timedelta",
-        cancel_time="timedelta",
     ):
         if not self.delegator_ids:
             return
@@ -465,6 +463,21 @@ class StateMachine:
             tx = self.veboost.transferFrom(_from, _to, token_id, {"from": _from})
             self.state.transfer_from(_from, _to, token_id, tx.timestamp, True)
 
+    def rule_cancel_boost(self, caller: Account = "account"):
+        available_tokens = list(self.state.boost_tokens.keys())
+        if not available_tokens:
+            return
+        token_id = available_tokens.pop()
+
+        try:
+            self.state.cancel_boost(token_id, caller, chain.time())
+        except AssertionError:
+            with brownie.reverts():
+                self.veboost.cancel_boost(token_id, {"from": caller})
+        else:
+            tx = self.veboost.cancel_boost(token_id, {"from": caller})
+            self.state.cancel_boost(token_id, caller, tx.timestamp, True)
+
     def rule_advance_time(self, timedelta):
         chain.mine(timedelta=timedelta)
 
@@ -490,5 +503,5 @@ def test_boost_state(state_machine, accounts, crv, vecrv, veboost):
         crv,
         vecrv,
         veboost,
-        settings={"max_examples": 25},
+        settings={"stateful_step_count": 25},
     )

@@ -395,7 +395,7 @@ class StateMachine:
         expire_time="timedelta",
         cancel_time="timedelta",
     ):
-        token_id = self.state.get_token_id(delegator, _id)
+        token_id = self.state.get_token_id(delegator.address, _id)
         if token_id not in self.state.boost_tokens:
             assert self.veboost.ownerOf(token_id) == ZERO_ADDRESS
             return

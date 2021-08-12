@@ -105,6 +105,10 @@ future_admin: public(address)
 is_killed: public(bool)
 
 totalSupply: public(uint256)
+# use totalSupply to determine the length
+tokenByIndex: public(HashMap[uint256, uint256])
+# use balanceOf to determine the length
+tokenOfOwnerByIndex: public(HashMap[address, uint256[MAX_UINT256]])
 
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist

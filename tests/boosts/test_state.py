@@ -300,8 +300,7 @@ class ContractState:
 class StateMachine:
 
     account = strategy("address")
-    token_id = strategy("uint128")
-    timedelta = strategy("uint32", min_value=DAY, max_value=4 * YEAR)
+    timedelta = strategy("uint32", min_value=WEEK - DAY, max_value=2 * YEAR)
     pct = strategy("int16", min_value=-1, max_value=10_001)
 
     def __init__(
@@ -316,27 +315,22 @@ class StateMachine:
         brownie.multicall.deploy({"from": accounts[0]})
 
     def setup(self) -> None:
+        self.state = ContractState()
+        self.delegator_ids = defaultdict(set)
+
         total_supply = self.crv.balanceOf(self.accounts[0])
         amount = total_supply // len(self.accounts)
         for account in self.accounts:
             self.crv.transfer(account, amount, {"from": self.accounts[0]})
             self.crv.approve(self.vecrv, 2 ** 256 - 1, {"from": account})
-
-        self.state = ContractState()
-
-    def initialize(self):
-        # lock up half of each accounts balance for 2 years
-        for account in self.accounts:
-            self.vecrv.create_lock(
-                self.crv.balanceOf(account), chain.time() + 2 * YEAR, {"from": account}
-            )
+            # lock up half of each accounts balance for 3 years
+            self.vecrv.create_lock(amount, chain.time() + 3 * YEAR, {"from": account})
 
     def rule_create_boost(
         self,
         percentage: int = "pct",
         cancel_time: int = "timedelta",
         expire_time: int = "timedelta",
-        _id: int = "token_id",
         delegator: Account = "account",
         receiver: Account = "account",
     ):
@@ -344,6 +338,8 @@ class StateMachine:
             vecrv_balance = self.vecrv.balanceOf(delegator)
             lock_expiry = self.vecrv.locked__end(delegator)
 
+        _id = (set(range(10000)) - self.delegator_ids[delegator]).pop()
+        self.delegator_ids[delegator].add(_id)
         try:
             self.state.create_boost(
                 delegator,
@@ -390,15 +386,14 @@ class StateMachine:
     def rule_extend_boost(
         self,
         pct: int,
-        delegator: Account = "account",
-        _id: int = "token_id",
         expire_time="timedelta",
         cancel_time="timedelta",
     ):
-        token_id = self.state.get_token_id(delegator.address, _id)
-        if token_id not in self.state.boost_tokens:
-            assert self.veboost.ownerOf(token_id) == ZERO_ADDRESS
+        if not self.delegator_ids:
             return
+        delegator = list(self.delegator_ids.keys()).pop()
+        _id = self.delegator_ids[delegator].pop()
+        token_id = self.state.get_token_id(delegator.address, _id)
 
         with brownie.multicall(block_identifier=chain.height):
             vecrv_balance = self.vecrv.balanceOf(delegator)
@@ -446,12 +441,10 @@ class StateMachine:
                 True,
             )
 
-    def rule_cancel_boost(self, owner: Account = "account", caller: Account = "account"):
-        if self.veboost.balanceOf(owner) == 0:
-            assert all([token.owner != owner for token in self.state.boost_tokens.values()])
+    def rule_cancel_boost(self, caller: Account = "account"):
+        available_tokens = list(self.state.boost_tokens.keys())
+        if not available_tokens:
             return
-
-        available_tokens = [k for k, v in self.state.boost_tokens.items() if v.owner == owner]
         token_id = available_tokens.pop()
 
         try:
@@ -463,13 +456,12 @@ class StateMachine:
             tx = self.veboost.cancel_boost(token_id, {"from": caller})
             self.state.cancel_boost(token_id, caller, tx.timestamp, True)
 
-    def rule_transfer_boost(self, _from: Account = "account", _to: Account = "account"):
-        if self.veboost.balanceOf(_from) == 0:
-            assert all([token.owner != _from for token in self.state.boost_tokens.values()])
+    def rule_transfer_boost(self, _to: Account = "account"):
+        available_tokens = list(self.state.boost_tokens.keys())
+        if not available_tokens:
             return
-
-        available_tokens = [k for k, v in self.state.boost_tokens.items() if v.owner == _from]
         token_id = available_tokens.pop()
+        _from = self.state.boost_tokens[token_id].owner
 
         try:
             self.state.transfer_from(_from, _to, token_id, chain.time())
@@ -505,5 +497,5 @@ def test_boost_state(state_machine, accounts, crv, vecrv, veboost):
         crv,
         vecrv,
         veboost,
-        settings={"max_examples": 100, "stateful_step_count": 50},
+        settings={"max_examples": 25, "stateful_step_count": 25},
     )

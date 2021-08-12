@@ -446,6 +446,23 @@ class StateMachine:
                 True,
             )
 
+    def rule_cancel_boost(self, owner: Account = "account", caller: Account = "account"):
+        if self.veboost.balanceOf(owner) == 0:
+            assert all([token.owner != owner for token in self.state.boost_tokens.values()])
+            return
+
+        available_tokens = [k for k, v in self.state.boost_tokens.items() if v.owner == owner]
+        token_id = available_tokens.pop()
+
+        try:
+            self.state.cancel_boost(token_id, caller, chain.time())
+        except AssertionError:
+            with brownie.reverts():
+                self.veboost.cancel_boost(token_id, {"from": caller})
+        else:
+            tx = self.veboost.cancel_boost(token_id, {"from": caller})
+            self.state.cancel_boost(token_id, caller, tx.timestamp, True)
+
     def rule_advance_time(self):
         chain.mine(timedelta=2 * WEEK)
 

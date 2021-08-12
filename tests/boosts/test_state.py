@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import DefaultDict
 
-from brownie import convert
+from brownie import ZERO_ADDRESS, convert
 from brownie.network.account import Account
 from dataclassy import dataclass
 
@@ -256,8 +256,31 @@ class ContractState:
             self.boost[token.delegator].delegated -= token
             self.boost[token.owner].received -= token
 
-    def transfer_from(self, _from: Account, _to: Account, token_id: int):
-        pass
+    def transfer_from(
+        self,
+        _from: Account,
+        _to: Account,
+        token_id: int,
+        timestamp: int,
+        update_state: bool = False,
+    ):
+        assert self.boost_tokens[token_id].owner == _from
+        assert _to != ZERO_ADDRESS
+
+        token: Token = self.boost_tokens[token_id]
+        value: int = token(timestamp)
+
+        if update_state:
+            if value > 0:
+                self.boost[_from].received -= token
+                self.boost[_to].received += token
+                self.boost_tokens[token_id].owner = _to
+            else:
+                self.boost[token.delegator].delegated -= token
+                self.boost[_from] -= token
+                self.boost_tokens[token_id].slope = 0
+                self.boost_tokens[token_id].bias = 0
+                self.boost_tokens[token_id].owner = _to
 
     @staticmethod
     def get_token_id(account: str, _id: int) -> int:

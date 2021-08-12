@@ -203,7 +203,11 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated -= data
     self.boost[_receiver].received -= data
-    self.boost_tokens[_token_id] = empty(Token)
+
+    token: Token = self.boost_tokens[_token_id]
+    token.data = 0
+    token.cancel_time = 0
+    self.boost_tokens[_token_id] = token
 
 
 @internal

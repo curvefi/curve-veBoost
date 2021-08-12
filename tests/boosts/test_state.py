@@ -463,6 +463,23 @@ class StateMachine:
             tx = self.veboost.cancel_boost(token_id, {"from": caller})
             self.state.cancel_boost(token_id, caller, tx.timestamp, True)
 
+    def rule_transfer_boost(self, _from: Account = "account", _to: Account = "account"):
+        if self.veboost.balanceOf(_from) == 0:
+            assert all([token.owner != _from for token in self.state.boost_tokens.values()])
+            return
+
+        available_tokens = [k for k, v in self.state.boost_tokens.items() if v.owner == _from]
+        token_id = available_tokens.pop()
+
+        try:
+            self.state.transfer_from(_from, _to, token_id, chain.time())
+        except AssertionError:
+            with brownie.reverts():
+                self.veboost.transferFrom(_from, _to, token_id, {"from": _from})
+        else:
+            tx = self.veboost.transferFrom(_from, _to, token_id, {"from": _from})
+            self.state.transfer_from(_from, _to, token_id, tx.timestamp, True)
+
     def rule_advance_time(self):
         chain.mine(timedelta=2 * WEEK)
 
@@ -482,4 +499,11 @@ class StateMachine:
 
 
 def test_boost_state(state_machine, accounts, crv, vecrv, veboost):
-    state_machine(StateMachine, accounts, crv, vecrv, veboost, settings={"max_examples": 10})
+    state_machine(
+        StateMachine,
+        accounts,
+        crv,
+        vecrv,
+        veboost,
+        settings={"max_examples": 100, "stateful_step_count": 50},
+    )

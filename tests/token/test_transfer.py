@@ -44,15 +44,15 @@ def test_transfer_event_fires(alice, bob, veboost):
 
 
 def test_neither_owner_nor_approved(alice, bob, veboost):
-    with brownie.reverts("dev: neither owner nor approved"):
+    with brownie.reverts(dev_revert_msg="dev: neither owner nor approved"):
         veboost.transferFrom(alice, bob, 0, {"from": bob})
 
 
 def test_transfer_to_null_account_reverts(alice, veboost):
-    with brownie.reverts("dev: transfers to ZERO_ADDRESS are disallowed"):
+    with brownie.reverts(dev_revert_msg="dev: transfers to ZERO_ADDRESS are disallowed"):
         veboost.transferFrom(alice, ZERO_ADDRESS, 0, {"from": alice})
 
 
 def test_from_address_is_not_owner(alice, bob, veboost):
-    with brownie.reverts("dev: _from is not owner"):
+    with brownie.reverts(dev_revert_msg="dev: _from is not owner"):
         veboost.transferFrom(bob, alice, 0, {"from": alice})

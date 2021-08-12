@@ -63,7 +63,7 @@ def test_delegator_can_cancel_after_cancel_time_or_expiry(
         cancel_times = [veboost.token_cancel_time(token) for token in tokens]
 
     if chain.time() < max(cancel_times):
-        with brownie.reverts("dev: must wait for cancel time"):
+        with brownie.reverts(dev_revert_msg="dev: must wait for cancel time"):
             veboost.batch_cancel_boosts(tokens + [0] * 246, {"from": caller})
     else:
         tx = veboost.batch_cancel_boosts(tokens + [0] * 246, {"from": caller})

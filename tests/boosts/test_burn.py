@@ -19,7 +19,7 @@ def test_burning_token(alice, bob, charlie, veboost, use_operator):
 @pytest.mark.parametrize("idx", [0] + list(range(2, 5)))
 def test_third_party_cannot_burn_token(alice, accounts, veboost, idx):
     token_id = veboost.get_token_id(alice, 0)
-    with brownie.reverts("dev: neither owner nor approved"):
+    with brownie.reverts(dev_revert_msg="dev: neither owner nor approved"):
         veboost.burn(token_id, {"from": accounts[idx]})
 
 

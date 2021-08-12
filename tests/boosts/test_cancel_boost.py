@@ -38,7 +38,7 @@ def test_delegator_can_cancel_after_cancel_time_or_expiry(
     token = veboost.get_token_id(alice, 0)
 
     if chain.time() < cancel_time:
-        with brownie.reverts("dev: must wait for cancel time"):
+        with brownie.reverts(dev_revert_msg="dev: must wait for cancel time"):
             veboost.cancel_boost(token, {"from": caller})
     else:
         veboost.cancel_boost(token, {"from": caller})
@@ -65,5 +65,5 @@ def test_third_parties_can_only_cancel_past_expiry(
 
 def test_cancel_non_existent_boost_reverts(alice, veboost):
 
-    with brownie.reverts("dev: token does not exist"):
+    with brownie.reverts(dev_revert_msg="dev: token does not exist"):
         veboost.cancel_boost(veboost.get_token_id(alice, 10), {"from": alice})

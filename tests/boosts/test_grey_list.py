@@ -26,7 +26,7 @@ def test_create_boost_grey_list_control(
         veboost.create_boost(alice, bob, 10_000, 0, alice_unlock_time, 0, {"from": caller})
         return
 
-    with brownie.reverts("dev: mint boost not allowed"):
+    with brownie.reverts(dev_revert_msg="dev: mint boost not allowed"):
         veboost.create_boost(alice, bob, 10_000, 0, alice_unlock_time, 0, {"from": caller})
 
 
@@ -59,7 +59,7 @@ def test_extend_boost_grey_list_control(
         assert math.isclose(veboost.token_boost(token), veboost.delegated_boost(alice))
         return
 
-    with brownie.reverts("dev: mint boost not allowed"):
+    with brownie.reverts(dev_revert_msg="dev: mint boost not allowed"):
         veboost.extend_boost(token, 10_000, expire_time, cancel_time, {"from": caller})
 
 
@@ -91,7 +91,7 @@ def test_transferring_boost_grey_list_control(
         assert veboost.received_boost(dave) > 0 and veboost.received_boost(bob) == 0
         return
 
-    with brownie.reverts("dev: transfer boost not allowed"):
+    with brownie.reverts(dev_revert_msg="dev: transfer boost not allowed"):
         veboost.transferFrom(bob, dave, token, {"from": caller})
 
 
@@ -123,7 +123,7 @@ def test_batch_set_delegation_status_only_owner_operator(alice, accounts, bob, v
     delegators = [ZERO_ADDRESS] + accounts[2:]
     statuses = [False] + [True] * len(accounts[2:])
 
-    with brownie.reverts("dev: only receiver or operator"):
+    with brownie.reverts(dev_revert_msg="dev: only receiver or operator"):
         veboost.batch_set_delegation_status(
             alice,
             delegators + [ETH_ADDRESS] * (256 - len(delegators)),

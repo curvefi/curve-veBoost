@@ -60,5 +60,5 @@ def test_operator_approval_event_fired(alice, bob, dave, veboost):
 
 
 def test_caller_not_owner_or_operator(bob, veboost):
-    with brownie.reverts("dev: must be owner or operator"):
+    with brownie.reverts(dev_revert_msg="dev: must be owner or operator"):
         veboost.approve(bob, 0, {"from": bob})

@@ -64,7 +64,7 @@ def test_invalid_slope(alice, charlie, chain, crv, vecrv, veboost):
     crv.approve(vecrv, amount * 10, {"from": charlie})
     vecrv.create_lock(amount * 10, unlock_time, {"from": charlie})
 
-    with brownie.reverts("dev: invalid slope"):
+    with brownie.reverts(dev_revert_msg="dev: invalid slope"):
         veboost.create_boost(charlie, alice, 1_000, 0, unlock_time, 0, {"from": charlie})
 
 
@@ -89,39 +89,39 @@ def test_negative_outstanding_boosts(alice, chain, alice_unlock_time, veboost):
     expiry = chain.time() + WEEK
     veboost.create_boost(alice, alice, 10_000, 0, expiry, 0, {"from": alice})
     chain.mine(timestamp=expiry + 1)
-    with brownie.reverts("dev: outstanding negative boosts"):
+    with brownie.reverts(dev_revert_msg="dev: outstanding negative boosts"):
         veboost.create_boost(alice, alice, 5_000, 0, alice_unlock_time, 1, {"from": alice})
 
 
 def test_no_boost_available_to_delegate_reverts(alice, alice_unlock_time, veboost):
     veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 0, {"from": alice})
-    with brownie.reverts("dev: no boost"):
+    with brownie.reverts(dev_revert_msg="dev: no boost"):
         veboost.create_boost(alice, alice, 5_000, 0, alice_unlock_time, 1, {"from": alice})
 
 
 def test_implicit_token_existence_check(alice, alice_unlock_time, veboost):
     veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 0, {"from": alice})
-    with brownie.reverts("dev: token exists"):
+    with brownie.reverts(dev_revert_msg="dev: token exists"):
         veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 0, {"from": alice})
 
 
 def test_id_out_of_bounds(alice, alice_unlock_time, veboost):
-    with brownie.reverts("dev: id out of bounds"):
+    with brownie.reverts(dev_revert_msg="dev: id out of bounds"):
         veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 2 ** 96, {"from": alice})
 
 
 def test_expire_time_after_lock_expiry_reverts(alice, alice_unlock_time, veboost):
-    with brownie.reverts("dev: boost expiration is past voting escrow lock expiry"):
+    with brownie.reverts(dev_revert_msg="dev: boost expiration is past voting escrow lock expiry"):
         veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time + 1, 0, {"from": alice})
 
 
 def test_expire_time_below_min_time_reverts(alice, chain, veboost):
-    with brownie.reverts("dev: boost duration must be atleast MIN_DELEGATION_TIME"):
+    with brownie.reverts(dev_revert_msg="dev: boost duration must be atleast MIN_DELEGATION_TIME"):
         veboost.create_boost(alice, alice, 10_000, 0, chain.time() + 3600, 0, {"from": alice})
 
 
 def test_cancel_time_after_expiry_reverts(alice, alice_unlock_time, veboost):
-    with brownie.reverts("dev: cancel time is after expiry"):
+    with brownie.reverts(dev_revert_msg="dev: cancel time is after expiry"):
         veboost.create_boost(
             alice, alice, 10_000, alice_unlock_time + 1, alice_unlock_time, 0, {"from": alice}
         )
@@ -140,5 +140,5 @@ def test_invalid_boost_percentage(alice, alice_unlock_time, veboost, pct, msg):
 
 
 def test_boost_zero_address_reverts(alice, alice_unlock_time, veboost):
-    with brownie.reverts("dev: minting to ZERO_ADDRESS disallowed"):
+    with brownie.reverts(dev_revert_msg="dev: minting to ZERO_ADDRESS disallowed"):
         veboost.create_boost(alice, ZERO_ADDRESS, 10_000, 0, alice_unlock_time, 0, {"from": alice})

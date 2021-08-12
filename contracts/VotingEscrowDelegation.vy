@@ -618,7 +618,7 @@ def set_delegation_status(_receiver: address, _delegator: address, _status: bool
     @notice Set or reaffirm the blacklist/whitelist status of a delegator for a receiver.
     @dev Setting delegator as the ZERO_ADDRESS enables users to deactive delegations globally
         and enable the white list. The ability of a delegator to delegate to a receiver
-        is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][ZERO_ADDRESS]).
+        is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][_delegator]).
     @param _receiver The account which we will be updating it's list
     @param _delegator The account to disallow/allow delegations from
     @param _status Boolean of the status to set the _delegator account to
@@ -633,7 +633,7 @@ def batch_set_delegation_status(_receiver: address, _delegators: address[256], _
     @notice Set or reaffirm the blacklist/whitelist status of multiple delegators for a receiver.
     @dev Setting delegator as the ZERO_ADDRESS enables users to deactive delegations globally
         and enable the white list. The ability of a delegator to delegate to a receiver
-        is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][ZERO_ADDRESS]).
+        is determined by ~(grey_list[_receiver][ZERO_ADDRESS] ^ grey_list[_receiver][_delegator]).
     @param _receiver The account which we will be updating it's list
     @param _delegators List of 256 accounts to disallow/allow delegations from
     @param _status List of 256 0s and 1s (booleans) of the status to set the _delegator_i account to.

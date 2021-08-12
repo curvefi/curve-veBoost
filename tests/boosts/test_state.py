@@ -185,7 +185,7 @@ class ContractState:
         token.cancel_time = cancel_time
 
         token_id: int = self.get_token_id(delegator.address, _id)
-        assert self.boost_tokens[token_id] == Token()
+        assert self.boost_tokens[token_id].owner is None
 
         # modify state last
         if update_state:
@@ -240,8 +240,21 @@ class ContractState:
             self.boost[token.owner].received -= token
             self.boost[token.owner].received += new_token
 
-    def cancel_boost(self, token_id: int):
-        pass
+    def cancel_boost(
+        self, token_id: int, caller: Account, timestamp: int, update_state: bool = False
+    ):
+        token: Token = self.boost_tokens[token_id]
+        assert token.owner is not None
+        if caller == token.owner:
+            if caller == token.delegator:
+                assert timestamp >= token.cancel_time
+            else:
+                assert timestamp >= token.expire_time
+
+        if update_state:
+            self.boost_tokens[token_id] *= 0
+            self.boost[token.delegator].delegated -= token
+            self.boost[token.owner].received -= token
 
     def transfer_from(self, _from: Account, _to: Account, token_id: int):
         pass

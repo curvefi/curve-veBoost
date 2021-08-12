@@ -61,3 +61,9 @@ def test_third_parties_can_only_cancel_past_expiry(
     else:
         veboost.cancel_boost(token, {"from": charlie})
         assert veboost.token_boost(token) == 0
+
+
+def test_cancel_non_existent_boost_reverts(alice, veboost):
+
+    with brownie.reverts("dev: token does not exist"):
+        veboost.cancel_boost(veboost.get_token_id(alice, 10), {"from": alice})

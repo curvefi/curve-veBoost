@@ -1,3 +1,6 @@
+from collections import defaultdict
+from typing import DefaultDict
+
 from brownie.network.account import Account
 from dataclassy import dataclass
 
@@ -122,3 +125,47 @@ class Token(Line):
 
     def __call__(self, x: int) -> int:
         return super().__call__(x)
+
+
+@dataclass(slots=True, iter=True)
+class Boost:
+
+    delegated: Line = Line(0, 0)
+    received: Line = Line(0, 0)
+
+
+class ContractState:
+    def __init__(self) -> None:
+
+        self.boost: DefaultDict[Account, Boost] = defaultdict(Boost)
+        self.boost_tokens: DefaultDict[int, Token] = defaultdict(Token)
+
+    def create_boost(
+        self,
+        delegator: Account,
+        receiver: Account,
+        percentage: int,
+        cancel_time: int,
+        expire_time: int,
+        _id: int,
+        timestamp: int,
+        vecrv_balance: int,
+    ):
+        pass
+
+    def extend_boost(
+        self,
+        token_id: int,
+        percentage: int,
+        expire_time: int,
+        cancel_time: int,
+        timestamp: int,
+        vecrv_balance: int,
+    ):
+        pass
+
+    def cancel_boost(self, token_id: int):
+        pass
+
+    def transfer_from(self, _from: Account, _to: Account, token_id: int):
+        pass

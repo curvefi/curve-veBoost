@@ -150,6 +150,63 @@ def _is_approved_or_owner(_spender: address, _token_id: uint256) -> bool:
 
 
 @internal
+def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
+    position_data: uint256 = self.boost_tokens[_token_id].position
+    local_pos: uint256 = position_data % 2 ** 128
+    global_pos: uint256 = shift(position_data, -128)
+
+    if _from == ZERO_ADDRESS:
+        # minting - This is called before updates to balance and totalSupply
+        local_pos = self.balanceOf[_to]
+        global_pos = self.totalSupply
+        position_data = shift(global_pos, 128) + local_pos
+
+        self.tokenByIndex[global_pos] = _token_id
+        self.tokenOfOwnerByIndex[_to][local_pos] = _token_id
+        self.boost_tokens[_token_id].position = position_data
+
+    elif _to == ZERO_ADDRESS:
+        # burning - This is called after updates to balance and totalSupply
+        # we operate on both the global array and local array
+        last_global_index: uint256 = self.totalSupply
+        last_local_index: uint256 = self.balanceOf[_from]
+
+        if global_pos != last_global_index:
+            # swap - set the token we're burnings position to the token in the last index
+            last_global_token: uint256 = self.tokenByIndex[last_global_index]
+            last_global_token_pos: uint256 = self.boost_tokens[last_global_token].position
+            # update the global position of the last global token
+            self.boost_tokens[last_global_token].position = shift(global_pos, 128) + (last_global_token_pos % 2 ** 128)
+            self.tokenByIndex[global_pos] = last_global_token
+        self.tokenByIndex[last_global_index] = 0
+
+        if local_pos != last_local_index:
+            # swap - set the token we're burnings position to the token in the last index
+            last_local_token: uint256 = self.tokenOfOwnerByIndex[_from][last_local_index]
+            last_local_token_pos: uint256 = self.boost_tokens[last_local_token].position
+            # update the local position of the last local token
+            self.boost_tokens[last_local_token].position = shift(last_local_token_pos / 2 ** 128, 128) + local_pos
+            self.tokenOfOwnerByIndex[_from][local_pos] = last_local_token
+        self.tokenOfOwnerByIndex[_from][last_local_index] = 0
+
+    else:
+        # transfering - called between balance updates
+        from_last_index: uint256 = self.balanceOf[_from]
+
+        if local_pos != from_last_index:
+            # swap - set the token we're burnings position to the token in the last index
+            last_local_token: uint256 = self.tokenOfOwnerByIndex[_from][from_last_index]
+            last_local_token_pos: uint256 = self.boost_tokens[last_local_token].position
+            # update the local position of the last local token
+            self.boost_tokens[last_local_token].position = shift(last_local_token_pos / 2 ** 128, 128) + local_pos
+            self.tokenOfOwnerByIndex[_from][local_pos] = last_local_token
+        self.tokenOfOwnerByIndex[_from][from_last_index] = 0
+
+        # to is simple we just add to the end of the list
+        self.tokenOfOwnerByIndex[_to][self.balanceOf[_to]] = _token_id
+
+
+@internal
 def _burn(_token_id: uint256):
     owner: address = self.ownerOf[_token_id]
 
@@ -159,6 +216,8 @@ def _burn(_token_id: uint256):
     self.ownerOf[_token_id] = ZERO_ADDRESS
     self.totalSupply -= 1
 
+    self._update_enumeration_data(owner, ZERO_ADDRESS, _token_id)
+
     log Transfer(owner, ZERO_ADDRESS, _token_id)
 
 
@@ -167,13 +226,7 @@ def _mint(_to: address, _token_id: uint256):
     assert _to != ZERO_ADDRESS  # dev: minting to ZERO_ADDRESS disallowed
     assert self.ownerOf[_token_id] == ZERO_ADDRESS  # dev: token exists
 
-    local_pos: uint256 = self.balanceOf[_to]
-    global_pos: uint256 = self.totalSupply
-    position_data: uint256 = shift(global_pos, 128) + local_pos
-
-    self.tokenByIndex[global_pos] = _token_id
-    self.tokenOfOwnerByIndex[_to][local_pos] = _token_id
-    self.boost_tokens[_token_id].position = position_data
+    self._update_enumeration_data(ZERO_ADDRESS, _to, _token_id)
 
     self.balanceOf[_to] += 1
     self.ownerOf[_token_id] = _to
@@ -246,6 +299,7 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
     self._approve(_from, ZERO_ADDRESS, _token_id)
 
     self.balanceOf[_from] -= 1
+    self._update_enumeration_data(_from, _to, _token_id)
     self.balanceOf[_to] += 1
     self.ownerOf[_token_id] = _to
 

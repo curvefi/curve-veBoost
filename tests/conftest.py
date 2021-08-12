@@ -1,4 +1,5 @@
 import pytest
+from brownie.network.state import Chain
 
 pytest_plugins = [
     "fixtures.accounts",
@@ -17,9 +18,9 @@ def module_isolation(chain):
 
 
 @pytest.fixture(autouse=True)
-def function_isolation(chain, history, module_isolation):
+def function_isolation(chain: Chain, history, module_isolation):
     """Custom function level isolation."""
     start = len(history)
     yield
-    if (undo_count := len(history) - start) > 0:
+    if (undo_count := len(history) - start) > 0 and len(chain._undo_buffer) >= undo_count:
         chain.undo(undo_count)

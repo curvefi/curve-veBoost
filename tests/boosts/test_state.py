@@ -249,11 +249,11 @@ class ContractState:
     ):
         token: Token = self.boost_tokens[token_id]
         assert token.owner is not None
-        if caller != token.owner:
+        if not (caller == token.owner or token(timestamp) < 0):
             if caller == token.delegator:
                 assert timestamp >= token.cancel_time
             else:
-                assert timestamp >= token.expire_time
+                assert False
 
         if update_state:
             self.boost_tokens[token_id] *= 0
@@ -281,7 +281,7 @@ class ContractState:
                 self.boost_tokens[token_id].owner = _to
             else:
                 self.boost[token.delegator].delegated -= token
-                self.boost[_from] -= token
+                self.boost[_from].received -= token
                 self.boost_tokens[token_id].slope = 0
                 self.boost_tokens[token_id].bias = 0
                 self.boost_tokens[token_id].owner = _to
@@ -468,6 +468,10 @@ class StateMachine:
         if not available_tokens:
             return
         token_id = available_tokens.pop()
+
+        if self.state.boost_tokens[token_id].owner is None:
+            assert self.veboost.ownerOf(token_id) == ZERO_ADDRESS
+            return
 
         try:
             self.state.cancel_boost(token_id, caller, chain.time())

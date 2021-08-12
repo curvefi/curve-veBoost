@@ -176,7 +176,7 @@ class ContractState:
         assert _id < 2 ** 96  # id with bounds
 
         delegated_boost: int = self.boost[delegator].delegated(timestamp)
-        assert delegated_boost > 0  # no outstanding negative boosts
+        assert delegated_boost >= 0  # no outstanding negative boosts
 
         y = percentage * (vecrv_balance - delegated_boost) // 10_000
         assert y > 0
@@ -223,7 +223,7 @@ class ContractState:
             assert timestamp >= token_expiry
 
         delegated_boost: int = (self.boost[token.delegator].delegated - token)(timestamp)
-        assert delegated_boost > 0
+        assert delegated_boost >= 0
 
         y: int = percentage * (vecrv_balance - delegated_boost) // 10_000
         assert y > 0

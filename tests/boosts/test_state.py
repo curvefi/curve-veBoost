@@ -301,9 +301,7 @@ class StateMachine:
 
     account = strategy("address")
     token_id = strategy("uint128")
-    timedelta = strategy(
-        "uint32", min_value=int(chain.time()), max_value=int(chain.time()) + 40 * YEAR
-    )
+    timedelta = strategy("uint32", min_value=DAY, max_value=4 * YEAR)
     pct = strategy("int16", min_value=-1, max_value=10_001)
 
     def __init__(
@@ -351,8 +349,8 @@ class StateMachine:
                 delegator,
                 receiver,
                 percentage,
-                cancel_time,
-                expire_time,
+                int(cancel_time + chain.time()),
+                int(expire_time + chain.time()),
                 _id,
                 int(chain.time()),
                 vecrv_balance,
@@ -364,8 +362,8 @@ class StateMachine:
                     delegator,
                     receiver,
                     percentage,
-                    cancel_time,
-                    expire_time,
+                    int(cancel_time + chain.time()),
+                    int(expire_time + chain.time()),
                     _id,
                     {"from": delegator},
                 )
@@ -380,13 +378,17 @@ class StateMachine:
                 delegator,
                 receiver,
                 percentage,
-                cancel_time,
-                expire_time,
+                int(tx.timestamp + cancel_time),
+                int(tx.timestamp + expire_time),
                 _id,
                 tx.timestamp,
                 vecrv_balance,
                 lock_expiry,
+                True,
             )
+
+    def rule_advance_time(self):
+        chain.mine(timedelta=2 * WEEK)
 
     def invariant_adjusted_balance(self):
         for account in self.accounts:
@@ -401,3 +403,7 @@ class StateMachine:
                 rel_tol=0.0001,
                 abs_tol=100_000,
             )
+
+
+def test_boost_state(state_machine, accounts, crv, vecrv, veboost):
+    state_machine(StateMachine, accounts, crv, vecrv, veboost, settings={"max_examples": 10})

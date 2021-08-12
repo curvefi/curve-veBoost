@@ -43,6 +43,18 @@ def test_transfer_event_fires(alice, bob, veboost):
     assert tx.events["Transfer"] == dict(_from=alice, _to=bob, _token_id=0)
 
 
+def test_transfer_updates_enumerations(alice, bob, veboost):
+    veboost._mint_for_testing(alice, 10_000, {"from": alice})
+    veboost.transferFrom(alice, bob, 10_000, {"from": alice})
+
+    assert veboost.tokenByIndex(0) == 0
+    assert veboost.tokenByIndex(1) == 10_000
+    assert veboost.tokenOfOwnerByIndex(alice, 0) == 0
+    assert veboost.tokenOfOwnerByIndex(alice, 1) == 0
+    assert veboost.tokenOfOwnerByIndex(bob, 0) == 10_000
+    assert veboost.totalSupply() == 2
+
+
 def test_neither_owner_nor_approved(alice, bob, veboost):
     with brownie.reverts(dev_revert_msg="dev: neither owner nor approved"):
         veboost.transferFrom(alice, bob, 0, {"from": bob})

@@ -76,6 +76,8 @@ struct Token:
     # [bias uint128][slope int128]
     data: uint256
     cancel_time: uint256
+    # [global 128][local 128]
+    position: uint256
 
 
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
@@ -165,6 +167,14 @@ def _mint(_to: address, _token_id: uint256):
     assert _to != ZERO_ADDRESS  # dev: minting to ZERO_ADDRESS disallowed
     assert self.ownerOf[_token_id] == ZERO_ADDRESS  # dev: token exists
 
+    local_pos: uint256 = self.balanceOf[_to]
+    global_pos: uint256 = self.totalSupply
+    position_data: uint256 = shift(global_pos, 128) + local_pos
+
+    self.tokenByIndex[global_pos] = _token_id
+    self.tokenOfOwnerByIndex[_to][local_pos] = _token_id
+    self.boost_tokens[_token_id].position = position_data
+
     self.balanceOf[_to] += 1
     self.ownerOf[_token_id] = _to
     self.totalSupply += 1
@@ -181,7 +191,11 @@ def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
     self.boost[_delegator].delegated += data
     self.boost[_receiver].received += data
-    self.boost_tokens[_token_id] = Token({data: data, cancel_time: _cancel_time})
+
+    token: Token = self.boost_tokens[_token_id]
+    token.data = data
+    token.cancel_time = _cancel_time
+    self.boost_tokens[_token_id] = token
 
 
 @internal

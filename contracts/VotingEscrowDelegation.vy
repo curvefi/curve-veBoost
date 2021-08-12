@@ -286,10 +286,10 @@ def _uint_to_string(_value: uint256) -> String[78]:
     for i in range(78):
         # go forward to find the # of digits, and set it
         # only if we have found the last index
-        if digits == 78 and _value / 10 ** convert(i, uint256) == 0:
-            digits = convert(i, uint256)
+        if digits == 78 and _value / 10 ** i == 0:
+            digits = i
 
-        value: uint256 = ((_value / 10 ** convert(77 - i, uint256)) % 10) + 48
+        value: uint256 = ((_value / 10 ** (77 - i)) % 10) + 48
         char: Bytes[1] = slice(convert(value, bytes32), 31, 1)
         buffer = raw_call(
             IDENTITY_PRECOMPILE,

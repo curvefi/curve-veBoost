@@ -188,6 +188,7 @@ def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
             self.boost_tokens[last_local_token].position = shift(last_local_token_pos / 2 ** 128, 128) + local_pos
             self.tokenOfOwnerByIndex[_from][local_pos] = last_local_token
         self.tokenOfOwnerByIndex[_from][last_local_index] = 0
+        self.boost_tokens[_token_id].position = 0
 
     else:
         # transfering - called between balance updates
@@ -203,7 +204,9 @@ def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
         self.tokenOfOwnerByIndex[_from][from_last_index] = 0
 
         # to is simple we just add to the end of the list
-        self.tokenOfOwnerByIndex[_to][self.balanceOf[_to]] = _token_id
+        local_pos = self.balanceOf[_to]
+        self.tokenOfOwnerByIndex[_to][local_pos] = _token_id
+        self.boost_tokens[_token_id].position = shift(global_pos, 128) + local_pos
 
 
 @internal

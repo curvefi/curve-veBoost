@@ -33,7 +33,7 @@ def test_delegator_operator_can_extend_a_boost(alice, bob, expire_time, veboost,
     original_boost_value = veboost.token_boost(token)
     veboost.extend_boost(token, 7_500, expire_time + 1, cancel_time + 1, {"from": alice})
 
-    assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5)
+    assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5, rel_tol=10 ** -6)
     assert veboost.token_expiry(token) == expire_time + 1
     assert veboost.token_cancel_time(token) == cancel_time + 1
 

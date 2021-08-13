@@ -1,6 +1,7 @@
 from collections import defaultdict
 from functools import reduce
 
+from brownie import ZERO_ADDRESS
 from brownie.network.account import Accounts
 from brownie.network.contract import Contract
 from brownie.test import strategy
@@ -9,6 +10,7 @@ from brownie.test import strategy
 class StateMachine:
 
     st_addr = strategy("address")
+    st_id = strategy("uint96")
 
     def __init__(cls, accounts: Accounts, veboost: Contract):
         cls.alice = accounts[0]
@@ -16,16 +18,16 @@ class StateMachine:
         cls.veboost = veboost
 
     def setup(self):
-        self.auto_id = 0
         self.total_supply = 0
         self.ownership = defaultdict(set)
 
-    def rule_mint(self, st_addr):
-        _id = self.auto_id
-        self.veboost._mint_for_testing(st_addr, _id, {"from": st_addr})
-        self.auto_id += 1
+    def rule_mint(self, st_addr, st_id):
+        token_id = self.veboost.get_token_id(st_addr, st_id)
+        if self.veboost.ownerOf(token_id) != ZERO_ADDRESS:
+            return
+        self.veboost._mint_for_testing(st_addr, token_id, {"from": st_addr})
 
-        self.ownership[st_addr].add(_id)
+        self.ownership[st_addr].add(token_id)
         self.total_supply += 1
 
     def rule_burn(self):
@@ -71,4 +73,4 @@ class StateMachine:
 
 
 def test_state_machine(state_machine, accounts, veboost):
-    state_machine(StateMachine, accounts, veboost)
+    state_machine(StateMachine, accounts, veboost, settings={"stateful_step_count": 50})

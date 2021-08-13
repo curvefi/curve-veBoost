@@ -259,6 +259,7 @@ class ContractState:
             self.boost[token.delegator].delegated -= token
             self.boost[token.owner].received -= token
             self.boost_tokens[token_id] *= 0
+            self.boost_tokens[token_id].cancel_time = 0
 
     def transfer_from(
         self,

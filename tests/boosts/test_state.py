@@ -106,8 +106,8 @@ class Token(Line):
         Token(slope=11, bias=1, delegator=None, owner=None, cancel_time=0)
         >>> Token(1, 1) - Token(1, 0)
         Token(slope=0, bias=1, delegator=None, owner=None, cancel_time=0)
-        >>> Token(1, 1) * 0
-        Token(slope=0, bias=0, delegator=None, owner=None, cancel_time=0)
+        >>> Token(1, 1, 'someone', 'someone_else', 30) * 0
+        Token(slope=0, bias=0, delegator='someone', owner='someone_else', cancel_time=30)
         >>> list(Token(0, 1))
         [0, 1, None, None, 0]
         >>> Token.from_two_points((0, 0), (1, 1))
@@ -130,14 +130,14 @@ class Token(Line):
             return -self.bias // self.slope
 
     def __add__(self, other: "Token") -> "Token":
-        return Token(*super().__add__(other))
+        return Token(*super().__add__(other), *(list(self)[2:]))
 
     def __sub__(self, other: "Token") -> "Token":
-        return Token(*super().__sub__(other))
+        return Token(*super().__sub__(other), *(list(self)[2:]))
 
     def __mul__(self, other: int) -> "Token":
         assert isinstance(other, int)
-        return Token(*super().__mul__(other))
+        return Token(*super().__mul__(other), *(list(self)[2:]))
 
     def __call__(self, x: int) -> int:
         return super().__call__(x)

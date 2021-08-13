@@ -256,9 +256,9 @@ class ContractState:
                 assert False
 
         if update_state:
-            self.boost_tokens[token_id] *= 0
             self.boost[token.delegator].delegated -= token
             self.boost[token.owner].received -= token
+            self.boost_tokens[token_id] *= 0
 
     def transfer_from(
         self,

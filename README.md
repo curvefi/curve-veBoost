@@ -11,25 +11,25 @@ on provided liquidity. This means any account can receive boosted rewards on pro
 
 For eligible gauges, the equation for determining your adjusted veCRV balance is:
 
-Adjusted veCRV Balance = veCRV Balance - delegated veBoost + received veBoost
+`Adjusted veCRV Balance = veCRV Balance - delegated veBoost + received veBoost`
 
 Restrictions:
 
-- Minimum delegation period is 1 Week
+- Minimum delegation period is `1 Week`
 - Maximum delegation period is the delegator's veCRV lock end
-- Delegators can't delegate more than their veCRV balance - any outstanding veBoosts
+- Delegators can't delegate more than their `veCRV balance - any outstanding veBoosts`
 - Delegators can't newly delegate (or extend a delegation) with any outstanding negative veBoosts
 - Delegators can't cancel a veBoost before it's cancel time
 - Receivers can cancel a received veBoost at any time
 - Third parties can't cancel a veboost unless it is expired
-- Delegated boost is internally equal to, abs(sum(delegated veboost)), meaning an accounts veCRV balance can never get
+- Delegated boost is internally equal to, `abs(sum(delegated veboost))`, meaning an accounts veCRV balance can never get
   inflated due to negative outstanding boosts
-- Received boost is internally equal to, max(received veboost, 0), meaning an accounts received boost balance will never
+- Received boost is internally equal to, `max(received veboost, 0)`, meaning an accounts received boost balance will never
   result in decreasing their vanilla veCRV balance
 
 The adjusted formula on chain therefore is:
 
-Adjusted veCRV Balance = veCRV Balance - abs(delegated veBoost) + max(received veBoost, 0)
+`Adjusted veCRV Balance = veCRV Balance - abs(delegated veBoost) + max(received veBoost, 0)`
 
 In fact, if an account does not participate in delegating veBoost, their adjusted veCRV balance will never be below their vanilla veCRV balance.
 

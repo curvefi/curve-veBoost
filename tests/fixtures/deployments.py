@@ -1,6 +1,6 @@
 import brownie
 import pytest
-from brownie import ZERO_ADDRESS, compile_source
+from brownie import compile_source
 
 
 @pytest.fixture(scope="session")
@@ -18,7 +18,7 @@ def vecrv(alice, crv, pm):
 @pytest.fixture(scope="session")
 def veboost(alice, VotingEscrowDelegation, vecrv):
     source = VotingEscrowDelegation._build["source"]
-    source = source.replace(ZERO_ADDRESS, vecrv.address)
+    source = source.replace("0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2", vecrv.address)
 
     NewVotingEscrowDelegation = compile_source(source).Vyper
     return NewVotingEscrowDelegation.deploy("Curve veCRV Boost", "veCRV-Boost", "", {"from": alice})

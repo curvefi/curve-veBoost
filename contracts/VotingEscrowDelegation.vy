@@ -83,11 +83,7 @@ struct Token:
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
 MIN_DELEGATION_TIME: constant(uint256) = 86400 * 7
-#@ if mode == "test":
-VOTING_ESCROW: constant(address) = 0x0000000000000000000000000000000000000000
-#@ else:
 VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
-#@ endif
 
 
 balanceOf: public(HashMap[address, uint256])

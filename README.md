@@ -34,6 +34,13 @@ The adjusted formula on chain therefore is:
 In fact, if an account does not participate in delegating veBoost, their adjusted veCRV balance will never be below their vanilla veCRV balance.
 
 
+### Deployments
+
+
+- [VotingEscrowDelegation.vy](contracts/VotingEscrowDelegation.vy): [0xc620aaFD6Caa3Cb7566e54176dD2ED1A81d05655](https://etherscan.io/address/0xc620aaFD6Caa3Cb7566e54176dD2ED1A81d05655)
+- [DelegationProxy.vy](contracts/DelegationProxy.vy): [0x8E0c00ed546602fD9927DF742bbAbF726D5B0d16](https://etherscan.io/address/0x8E0c00ed546602fD9927DF742bbAbF726D5B0d16)
+
+
 ### Dependencies
 
 * [python3](https://www.python.org/downloads/release/python-368/) version 3.6 or greater, python3-dev

@@ -20,6 +20,9 @@ event ApplyAdmins:
     ownership_admin: address
     emergency_admin: address
 
+event DelegationSet:
+    delegation: address
+
 
 VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
 
@@ -38,6 +41,8 @@ def __init__(_delegation: address, _o_admin: address, _e_admin: address):
 
     self.ownership_admin = _o_admin
     self.emergency_admin = _e_admin
+
+    log DelegationSet(_delegation)
 
 
 @view
@@ -63,6 +68,7 @@ def kill_delegation():
     assert msg.sender in [self.ownership_admin, self.emergency_admin]
 
     self.delegation = ZERO_ADDRESS
+    log DelegationSet(ZERO_ADDRESS)
 
 
 @external
@@ -78,6 +84,7 @@ def set_delegation(_delegation: address):
     VeDelegation(_delegation).adjusted_balance_of(msg.sender)
 
     self.delegation = _delegation
+    log DelegationSet(_delegation)
 
 
 @external

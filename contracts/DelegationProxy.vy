@@ -7,6 +7,7 @@
 
 from vyper.interfaces import ERC20
 
+
 interface VeDelegation:
     def adjusted_balance_of(_account: address) -> uint256: view
 
@@ -37,36 +38,6 @@ def __init__(_delegation: address, _o_admin: address, _e_admin: address):
 
     self.ownership_admin = _o_admin
     self.emergency_admin = _e_admin
-
-
-@external
-def commit_set_admins(_o_admin: address, _e_admin: address):
-    """
-    @notice Set ownership admin to `_o_admin` and emergency admin to `_e_admin`
-    @param _o_admin Ownership admin
-    @param _e_admin Emergency admin
-    """
-    assert msg.sender == self.ownership_admin, "Access denied"
-
-    self.future_ownership_admin = _o_admin
-    self.future_emergency_admin = _e_admin
-
-    log CommitAdmins(_o_admin, _e_admin)
-
-
-@external
-def apply_set_admins():
-    """
-    @notice Apply the effects of `commit_set_admins`
-    """
-    assert msg.sender == self.ownership_admin, "Access denied"
-
-    _o_admin: address = self.future_ownership_admin
-    _e_admin: address = self.future_emergency_admin
-    self.ownership_admin = _o_admin
-    self.emergency_admin = _e_admin
-
-    log ApplyAdmins(_o_admin, _e_admin)
 
 
 @view
@@ -102,3 +73,33 @@ def set_delegation(_delegation: address):
     VeDelegation(_delegation).adjusted_balance_of(msg.sender)
 
     self.delegation = _delegation
+
+
+@external
+def commit_set_admins(_o_admin: address, _e_admin: address):
+    """
+    @notice Set ownership admin to `_o_admin` and emergency admin to `_e_admin`
+    @param _o_admin Ownership admin
+    @param _e_admin Emergency admin
+    """
+    assert msg.sender == self.ownership_admin, "Access denied"
+
+    self.future_ownership_admin = _o_admin
+    self.future_emergency_admin = _e_admin
+
+    log CommitAdmins(_o_admin, _e_admin)
+
+
+@external
+def apply_set_admins():
+    """
+    @notice Apply the effects of `commit_set_admins`
+    """
+    assert msg.sender == self.ownership_admin, "Access denied"
+
+    _o_admin: address = self.future_ownership_admin
+    _e_admin: address = self.future_emergency_admin
+    self.ownership_admin = _o_admin
+    self.emergency_admin = _e_admin
+
+    log ApplyAdmins(_o_admin, _e_admin)

@@ -43,6 +43,11 @@ def __init__(_delegation: address, _o_admin: address, _e_admin: address):
 @view
 @external
 def adjusted_balance_of(_account: address) -> uint256:
+    """
+    @notice Get the adjusted veCRV balance from the active boost delegation contract
+    @param _account The account to query the adjusted veCRV balance of
+    @return veCRV balance
+    """
     _delegation: address = self.delegation
     if _delegation == ZERO_ADDRESS:
         return ERC20(VOTING_ESCROW).balanceOf(_account)

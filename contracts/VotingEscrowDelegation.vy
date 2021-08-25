@@ -104,7 +104,6 @@ boost_tokens: HashMap[uint256, Token]
 
 admin: public(address)  # Can and will be a smart contract
 future_admin: public(address)
-is_killed: public(bool)
 
 totalSupply: public(uint256)
 # use totalSupply to determine the length
@@ -737,9 +736,6 @@ def adjusted_balance_of(_account: address) -> uint256:
     """
     vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_account), int256)
 
-    if self.is_killed:
-        return convert(vecrv_balance, uint256)
-
     boost: Boost = self.boost[_account]
     time: int256 = convert(block.timestamp, int256)
 
@@ -951,16 +947,6 @@ def accept_transfer_ownership():
     future_admin: address = self.future_admin
     assert msg.sender == future_admin
     self.admin = future_admin
-
-
-@external
-def set_killed(_killed: bool):
-    """
-    @notice Set the kill status of the contract
-    @param _killed Kill state to put the contract in, True = killed, False = alive
-    """
-    assert msg.sender == self.admin
-    self.is_killed = _killed
 
 
 @external

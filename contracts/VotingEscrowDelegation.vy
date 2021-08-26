@@ -272,7 +272,7 @@ def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
 
     token: Token = self.boost_tokens[_token_id]
     token.data = data
-    token.cancel_time = _cancel_time
+    token.dinfo = token.dinfo + _cancel_time
     self.boost_tokens[_token_id] = token
 
 
@@ -284,7 +284,8 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
 
     token: Token = self.boost_tokens[_token_id]
     token.data = 0
-    token.cancel_time = 0
+    # maintain the same position in the delegator array, but remove the cancel time
+    token.dinfo = shift(token.dinfo / 2 ** 128, 128)
     self.boost_tokens[_token_id] = token
 
 
@@ -363,7 +364,7 @@ def _cancel_boost(_token_id: uint256, _caller: address):
     if not (_caller == receiver or self.isApprovedForAll[receiver][_caller] or tvalue < 0):
         if _caller == delegator or self.isApprovedForAll[delegator][_caller]:
             # if delegator or operator, wait till after cancel time
-            assert token.cancel_time <= block.timestamp  # dev: must wait for cancel time
+            assert (token.dinfo % 2 ** 128) <= block.timestamp  # dev: must wait for cancel time
         else:
             # All others are disallowed
             raise "Not allowed!"
@@ -648,7 +649,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     # if we are extending an unexpired boost, the cancel time must the same or greater
     # else we can adjust the cancel time to our preference
-    if _cancel_time < token.cancel_time:
+    if _cancel_time < (token.dinfo % 2 ** 128):
         assert block.timestamp >= token_expiry  # dev: cancel time reduction disallowed
 
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
@@ -880,7 +881,7 @@ def token_cancel_time(_token_id: uint256) -> uint256:
         after it's expiration.
     @param _token_id The token id to query
     """
-    return self.boost_tokens[_token_id].cancel_time
+    return self.boost_tokens[_token_id].dinfo % 2 ** 128
 
 
 @view

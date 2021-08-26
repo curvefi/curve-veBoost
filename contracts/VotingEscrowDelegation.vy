@@ -75,7 +75,8 @@ struct Boost:
 struct Token:
     # [bias uint128][slope int128]
     data: uint256
-    cancel_time: uint256
+    # [delegator pos 128][cancel time 128]
+    dinfo: uint256
     # [global 128][local 128]
     position: uint256
 
@@ -106,6 +107,9 @@ totalSupply: public(uint256)
 tokenByIndex: public(HashMap[uint256, uint256])
 # use balanceOf to determine the length
 tokenOfOwnerByIndex: public(HashMap[address, uint256[MAX_UINT256]])
+
+token_of_delegator_by_index: public(HashMap[address, uint256[MAX_UINT256]])
+total_minted: public(HashMap[address, uint256])
 
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist
@@ -146,25 +150,38 @@ def _is_approved_or_owner(_spender: address, _token_id: uint256) -> bool:
 
 @internal
 def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
+    delegator: address = convert(shift(_token_id, -96), address)
     position_data: uint256 = self.boost_tokens[_token_id].position
     local_pos: uint256 = position_data % 2 ** 128
     global_pos: uint256 = shift(position_data, -128)
+    # position in the delegator array of minted tokens
+    delegator_pos: uint256 = shift(self.boost_tokens[_token_id].dinfo, -128)
 
     if _from == ZERO_ADDRESS:
         # minting - This is called before updates to balance and totalSupply
         local_pos = self.balanceOf[_to]
         global_pos = self.totalSupply
         position_data = shift(global_pos, 128) + local_pos
+        # this is a new token so we get the index of a new spot
+        delegator_pos = self.total_minted[delegator]
 
         self.tokenByIndex[global_pos] = _token_id
         self.tokenOfOwnerByIndex[_to][local_pos] = _token_id
         self.boost_tokens[_token_id].position = position_data
+
+        # we only mint tokens in the create_boost fn, and this is called
+        # before we update the cancel_time so we can just set the value
+        # of dinfo to the shifted position
+        self.boost_tokens[_token_id].dinfo = shift(delegator_pos, 128)
+        self.token_of_delegator_by_index[delegator][delegator_pos] = _token_id
+        self.total_minted[delegator] = delegator_pos + 1
 
     elif _to == ZERO_ADDRESS:
         # burning - This is called after updates to balance and totalSupply
         # we operate on both the global array and local array
         last_global_index: uint256 = self.totalSupply
         last_local_index: uint256 = self.balanceOf[_from]
+        last_delegator_pos: uint256 = self.total_minted[delegator] - 1
 
         if global_pos != last_global_index:
             # swap - set the token we're burnings position to the token in the last index
@@ -184,6 +201,16 @@ def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
             self.tokenOfOwnerByIndex[_from][local_pos] = last_local_token
         self.tokenOfOwnerByIndex[_from][last_local_index] = 0
         self.boost_tokens[_token_id].position = 0
+
+        if delegator_pos != last_delegator_pos:
+            last_delegator_token: uint256 = self.token_of_delegator_by_index[delegator][last_delegator_pos]
+            last_delegator_token_dinfo: uint256 = self.boost_tokens[_token_id].dinfo
+            # update the last tokens position data and maintain the correct cancel time
+            self.boost_tokens[last_delegator_pos].dinfo = shift(delegator_pos, 128) + (last_delegator_token_dinfo % 2 ** 128)
+            self.token_of_delegator_by_index[delegator][delegator_pos] = last_delegator_token
+        self.token_of_delegator_by_index[delegator][last_delegator_pos] = 0
+        self.boost_tokens[_token_id].dinfo = 0  # we are burning the token so we can just set to 0
+        self.total_minted[delegator] = last_delegator_pos
 
     else:
         # transfering - called between balance updates

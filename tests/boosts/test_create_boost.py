@@ -31,6 +31,14 @@ def test_create_a_boost(alice, bob, chain, alice_unlock_time, veboost, vecrv):
     assert token_boost_value == alice_delgated_boost
 
 
+def test_create_a_boost_updates_delegator_enumeration(alice, bob, alice_unlock_time, veboost):
+    veboost.create_boost(alice, bob, 10_000, 0, alice_unlock_time, 0, {"from": alice})
+    token_id = convert.to_uint(alice.address) << 96
+
+    assert veboost.total_minted(alice) == 1
+    assert veboost.token_of_delegator_by_index(alice, 0) == token_id
+
+
 def test_boost_self(alice, chain, alice_unlock_time, veboost, vecrv):
     veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 0, {"from": alice})
 

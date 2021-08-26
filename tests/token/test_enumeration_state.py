@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import reduce
 
-from brownie import ZERO_ADDRESS
+from brownie import ZERO_ADDRESS, convert
 from brownie.network.account import Accounts
 from brownie.network.contract import Contract
 from brownie.test import strategy
@@ -20,6 +20,7 @@ class StateMachine:
     def setup(self):
         self.total_supply = 0
         self.ownership = defaultdict(set)
+        self.delegator_tokens = defaultdict(set)
 
     def rule_mint(self, st_addr, st_id):
         token_id = self.veboost.get_token_id(st_addr, st_id)
@@ -28,6 +29,7 @@ class StateMachine:
         self.veboost._mint_for_testing(st_addr, token_id, {"from": st_addr})
 
         self.ownership[st_addr].add(token_id)
+        self.delegator_tokens[st_addr].add(token_id)
         self.total_supply += 1
 
     def rule_burn(self):
@@ -35,10 +37,14 @@ class StateMachine:
             return
 
         token_id = reduce(lambda a, b: a | b, self.ownership.values(), set()).pop()
+        delegator = self.accounts.at(
+            convert.to_address(convert.to_bytes(token_id >> 96, "bytes20"))
+        )
         _from = self.veboost.ownerOf(token_id)
         self.veboost._burn_for_testing(token_id, {"from": _from})
 
         self.ownership[_from].remove(token_id)
+        self.delegator_tokens[delegator].remove(token_id)
         self.total_supply -= 1
 
     def rule_transfer(self, st_addr):
@@ -70,6 +76,18 @@ class StateMachine:
         chain_tokens = {self.veboost.tokenByIndex(i) for i in range(len(tokens))}
 
         assert tokens == chain_tokens
+
+    def invariant_delegator_total_minted(self):
+        for acct in self.accounts:
+            assert self.veboost.total_minted(acct) == len(self.delegator_tokens[acct])
+
+    def invariant_delegator_tokens(self):
+        for acct in self.accounts:
+            tokens = {
+                self.veboost.token_of_delegator_by_index(acct, i)
+                for i in range(len(self.delegator_tokens[acct]))
+            }
+            assert tokens == self.delegator_tokens[acct]
 
 
 def test_state_machine(state_machine, accounts, veboost):

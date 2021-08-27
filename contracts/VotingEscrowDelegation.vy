@@ -890,7 +890,7 @@ def calc_boost_bias_slope(
     _delegator: address,
     _percentage: int256,
     _expire_time: int256,
-    _extend_token_id: uint256 = 2 ** 96
+    _extend_token_id: uint256 = 0
 ) -> (int256, int256):
     """
     @notice Calculate the bias and slope for a boost.
@@ -918,7 +918,7 @@ def calc_boost_bias_slope(
 
     ddata: uint256 = self.boost[_delegator].delegated
 
-    if _extend_token_id < 2 ** 96 and convert(shift(_extend_token_id, -96), address) == _delegator:
+    if _extend_token_id != 0 and convert(shift(_extend_token_id, -96), address) == _delegator:
         # decrease the delegated bias and slope by the token's bias and slope
         # only if it is the delegator's and it is within the bounds of existence
         ddata -= self.boost_tokens[_extend_token_id].data

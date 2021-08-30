@@ -83,7 +83,7 @@ struct Token:
 
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
-MIN_DELEGATION_TIME: constant(uint256) = 86400 * 7
+WEEK: constant(uint256) = 86400 * 7
 VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
 
 
@@ -566,7 +566,7 @@ def create_boost(
     # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(_delegator)
 
-    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast MIN_DELEGATION_TIME
+    assert _expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast WEEK
     assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
     assert _id < 2 ** 96  # dev: id out of bounds
 
@@ -629,7 +629,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     token: Token = self.boost_tokens[_token_id]
 
     assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
-    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
+    assert _expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast one day
     assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
 
     time: int256 = convert(block.timestamp, int256)
@@ -909,7 +909,7 @@ def calc_boost_bias_slope(
     time: int256 = convert(block.timestamp, int256)
     assert _percentage > 0  # dev: percentage must be greater than 0
     assert _percentage <= MAX_PCT  # dev: percentage must be less than or equal to 100%
-    assert _expire_time > time + MIN_DELEGATION_TIME  # dev: Invalid min expiry time
+    assert _expire_time > time + WEEK  # dev: Invalid min expiry time
 
     lock_expiry: int256 = convert(VotingEscrow(VOTING_ESCROW).locked__end(_delegator), int256)
     assert _expire_time <= lock_expiry

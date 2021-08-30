@@ -71,6 +71,7 @@ struct Boost:
     # [bias uint128][slope int128]
     delegated: uint256
     received: uint256
+    next_expiry: uint256
 
 struct Token:
     # [bias uint128][slope int128]
@@ -110,6 +111,8 @@ tokenOfOwnerByIndex: public(HashMap[address, uint256[MAX_UINT256]])
 
 token_of_delegator_by_index: public(HashMap[address, uint256[MAX_UINT256]])
 total_minted: public(HashMap[address, uint256])
+# address => timestamp => # of delegations expiring
+account_expiries: public(HashMap[address, HashMap[uint256, uint256]])
 
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist
@@ -559,6 +562,12 @@ def create_boost(
     @param _id The token id, within the range of [0, 2 ** 56)
     """
     assert msg.sender == _delegator or self.isApprovedForAll[_delegator][msg.sender]  # dev: only delegator or operator
+
+    next_expiry: uint256 = self.boost[_delegator].next_expiry
+    if next_expiry == 0:
+        next_expiry = MAX_UINT256
+
+    assert block.timestamp < next_expiry  # dev: negative boost token is in circulation
     assert _percentage > 0  # dev: percentage must be greater than 0 bps
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
     assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
@@ -583,10 +592,9 @@ def create_boost(
     dbias: int256 = 0
     dbias, dslope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
 
-    # verify delegated boost isn't negative, else it'll inflate out vecrv balance
+    # delegated boost will be positive, if any of circulating boosts are negative
+    # we have already reverted
     delegated_boost: int256 = dslope * time + dbias
-    assert delegated_boost >= 0  # dev: outstanding negative boosts
-
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
@@ -597,6 +605,11 @@ def create_boost(
     assert slope < 0  # dev: invalid slope
 
     self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time)
+
+    # increase the number of expiries for the user
+    if _expire_time < next_expiry:
+        self.boost[_delegator].next_expiry = _expire_time
+    self.account_expiries[_delegator][_expire_time] += 1
 
     log DelegateBoost(_delegator, _receiver, token_id, convert(y, uint256), _cancel_time, _expire_time)
 

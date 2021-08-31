@@ -593,7 +593,11 @@ def create_boost(
     assert msg.sender == _delegator or self.isApprovedForAll[_delegator][msg.sender]  # dev: only delegator or operator
 
     expire_time: uint256 = (_expire_time / WEEK) * WEEK
-    next_expiry: uint256 = self.boost[_delegator].next_expiry
+
+    expiry_data: uint256 = self.boost[_delegator].expiry_data
+    next_expiry: uint256 = expiry_data % 2 ** 128
+    active_delegations: uint256 = shift(expiry_data, -128)
+
     if next_expiry == 0:
         next_expiry = MAX_UINT256
 
@@ -638,8 +642,10 @@ def create_boost(
 
     # increase the number of expiries for the user
     if expire_time < next_expiry:
-        self.boost[_delegator].next_expiry = expire_time
+        next_expiry = expire_time
+
     self.account_expiries[_delegator][expire_time] += 1
+    self.boost[_delegator].expiry_data = shift(active_delegations + 1, 128) + next_expiry
 
     log DelegateBoost(_delegator, _receiver, token_id, convert(y, uint256), _cancel_time, _expire_time)
 

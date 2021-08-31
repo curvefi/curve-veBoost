@@ -830,7 +830,8 @@ def adjusted_balance_of(_account: address) -> uint256:
     @dev If boosts/delegations have a negative value, they're effective value is 0
     @param _account The account to query the adjusted balance of
     """
-    if self.boost[_account].expiry_data % 2 ** 128 < block.timestamp:
+    next_expiry: uint256 = self.boost[_account].expiry_data % 2 ** 128
+    if next_expiry < block.timestamp and next_expiry != 0:
         # if the account has a negative boost in circulation
         # we over penalize by setting their adjusted balance to 0
         # this is because we don't want to iterate to find the real

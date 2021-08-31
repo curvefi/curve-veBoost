@@ -81,6 +81,7 @@ struct Token:
     dinfo: uint256
     # [global 128][local 128]
     position: uint256
+    expire_time: uint256
 
 
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
@@ -265,7 +266,7 @@ def _mint(_to: address, _token_id: uint256):
 
 
 @internal
-def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256, _cancel_time: uint256):
+def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256, _cancel_time: uint256, _expire_time: uint256):
     is_whitelist: uint256 = convert(self.grey_list[_receiver][ZERO_ADDRESS], uint256)
     delegator_status: uint256 = convert(self.grey_list[_receiver][_delegator], uint256)
     assert not convert(bitwise_xor(is_whitelist, delegator_status), bool)  # dev: mint boost not allowed
@@ -277,6 +278,7 @@ def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     token: Token = self.boost_tokens[_token_id]
     token.data = data
     token.dinfo = token.dinfo + _cancel_time
+    token.expire_time = _expire_time
     self.boost_tokens[_token_id] = token
 
 
@@ -287,9 +289,12 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     self.boost[_receiver].received -= data
 
     token: Token = self.boost_tokens[_token_id]
+    expire_time: uint256 = token.expire_time
+
     token.data = 0
     # maintain the same position in the delegator array, but remove the cancel time
     token.dinfo = shift(token.dinfo / 2 ** 128, 128)
+    token.expire_time = 0
     self.boost_tokens[_token_id] = token
 
     # update the next expiry data
@@ -297,7 +302,6 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     next_expiry: uint256 = expiry_data % 2 ** 128
     active_delegations: uint256 = shift(expiry_data, -128) - 1
 
-    expire_time: uint256 = convert(-_bias/_slope, uint256)
     expiries: uint256 = self.account_expiries[_delegator][expire_time]
 
     if active_delegations != 0 and expire_time == next_expiry and expiries == 0:
@@ -308,6 +312,8 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
         # or
         # expiries != 0, the cancelled boost token isn't the only one expiring at expire_time
         for i in range(1, 513):  # ~10 years
+            # we essentially allow for a boost token be expired for up to 6 years
+            # 10 yrs - 4 yrs (max vecRV lock time) = ~ 6 yrs
             if i == 512:
                 raise "Failed to find next expiry"
             week_ts: uint256 = expire_time + WEEK * (i + 1)
@@ -638,7 +644,7 @@ def create_boost(
 
     assert slope < 0  # dev: invalid slope
 
-    self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time)
+    self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time, expire_time)
 
     # increase the number of expiries for the user
     if expire_time < next_expiry:
@@ -693,7 +699,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     # assert the new expiry is ahead of the already existing expiry, otherwise
     # this isn't really an extension
-    token_expiry: uint256 = convert(-tbias / tslope, uint256)
+    token_expiry: uint256 = token.expire_time
 
     # Can extend a token by increasing it's amount but not it's expiry time
     assert expire_time >= token_expiry  # dev: new expiration must be greater than old token expiry
@@ -737,7 +743,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     assert slope < 0  # dev: invalid slope
 
-    self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time)
+    self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time, expire_time)
 
     # increase the number of expiries for the user
     if expire_time < next_expiry:
@@ -928,13 +934,7 @@ def token_expiry(_token_id: uint256) -> uint256:
         date.
     @param _token_id The token id to query
     """
-    tslope: int256 = 0
-    tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
-    # y = mx + b -> (y - b) / m = x -> (0 - b)/m = x
-    if tslope == 0:
-        return 0
-    return convert(-tbias/tslope, uint256)
+    return self.boost_tokens[_token_id].expire_time
 
 
 @view

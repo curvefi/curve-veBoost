@@ -99,22 +99,22 @@ name: public(String[32])
 symbol: public(String[32])
 base_uri: public(String[128])
 
-boost: HashMap[address, Boost]
-boost_tokens: HashMap[uint256, Token]
-
-admin: public(address)  # Can and will be a smart contract
-future_admin: public(address)
-
 totalSupply: public(uint256)
 # use totalSupply to determine the length
 tokenByIndex: public(HashMap[uint256, uint256])
 # use balanceOf to determine the length
 tokenOfOwnerByIndex: public(HashMap[address, uint256[MAX_UINT256]])
 
+boost: HashMap[address, Boost]
+boost_tokens: HashMap[uint256, Token]
+
 token_of_delegator_by_index: public(HashMap[address, uint256[MAX_UINT256]])
 total_minted: public(HashMap[address, uint256])
 # address => timestamp => # of delegations expiring
 account_expiries: public(HashMap[address, HashMap[uint256, uint256]])
+
+admin: public(address)  # Can and will be a smart contract
+future_admin: public(address)
 
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist

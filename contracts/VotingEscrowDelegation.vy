@@ -292,6 +292,34 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     token.dinfo = shift(token.dinfo / 2 ** 128, 128)
     self.boost_tokens[_token_id] = token
 
+    # update the next expiry data
+    expiry_data: uint256 = self.boost[_delegator].expiry_data
+    next_expiry: uint256 = expiry_data % 2 ** 128
+    active_delegations: uint256 = shift(expiry_data, -128) - 1
+
+    expire_time: uint256 = convert(-_bias/_slope, uint256)
+    expiries: uint256 = self.account_expiries[_delegator][expire_time]
+
+    if active_delegations != 0 and expire_time == next_expiry and expiries == 0:
+        # Will be passed if
+        # active_delegations == 0, no more active boost tokens
+        # or
+        # expire_time != next_expiry, the cancelled boost token isn't the next expiring boost token
+        # or
+        # expiries != 0, the cancelled boost token isn't the only one expiring at expire_time
+        for i in range(1, 513):  # ~10 years
+            if i == 512:
+                raise "Failed to find next expiry"
+            week_ts: uint256 = expire_time + WEEK * (i + 1)
+            if self.account_expiries[_delegator][week_ts] > 0:
+                next_expiry = week_ts
+                break
+    elif active_delegations == 0:
+        next_expiry = 0
+
+    self.boost[_delegator].expiry_data = shift(active_delegations, 128) + next_expiry
+    self.account_expiries[_delegator][expire_time] = expiries - 1
+
 
 @internal
 def _transfer_boost(_from: address, _to: address, _bias: int256, _slope: int256):
@@ -373,34 +401,6 @@ def _cancel_boost(_token_id: uint256, _caller: address):
             # All others are disallowed
             raise "Not allowed!"
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
-
-    # update the next expiry data
-    expiry_data: uint256 = self.boost[delegator].expiry_data
-    next_expiry: uint256 = expiry_data % 2 ** 128
-    active_delegations: uint256 = shift(expiry_data, -128) - 1
-
-    expire_time: uint256 = convert(-tbias/tslope, uint256)
-    expiries: uint256 = self.account_expiries[delegator][expire_time]
-
-    if active_delegations != 0 and expire_time == next_expiry and expiries == 0:
-        # Will be passed if
-        # active_delegations == 0, no more active boost tokens
-        # or
-        # expire_time != next_expiry, the cancelled boost token isn't the next expiring boost token
-        # or
-        # expiries != 0, the cancelled boost token isn't the only one expiring at expire_time
-        for i in range(1, 513):  # ~10 years
-            if i == 512:
-                raise "Failed to find next expiry"
-            week_ts: uint256 = expire_time + WEEK * (i + 1)
-            if self.account_expiries[delegator][week_ts] > 0:
-                next_expiry = week_ts
-                break
-    elif active_delegations == 0:
-        next_expiry = 0
-
-    self.boost[delegator].expiry_data = shift(active_delegations, 128) + next_expiry
-    self.account_expiries[delegator][expire_time] = expiries - 1
 
     log BurnBoost(delegator, receiver, _token_id)
 

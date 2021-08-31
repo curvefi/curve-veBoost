@@ -830,6 +830,13 @@ def adjusted_balance_of(_account: address) -> uint256:
     @dev If boosts/delegations have a negative value, they're effective value is 0
     @param _account The account to query the adjusted balance of
     """
+    if self.boost[_account].expiry_data % 2 ** 128 < block.timestamp:
+        # if the account has a negative boost in circulation
+        # we over penalize by setting their adjusted balance to 0
+        # this is because we don't want to iterate to find the real
+        # value
+        return 0
+
     vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_account), int256)
 
     boost: Boost = self.boost[_account]

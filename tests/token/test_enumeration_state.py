@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import reduce
 
-from brownie import ZERO_ADDRESS, convert
+from brownie import ZERO_ADDRESS, chain, convert
 from brownie.network.account import Accounts
 from brownie.network.contract import Contract
 from brownie.test import strategy
@@ -12,21 +12,35 @@ class StateMachine:
     st_addr = strategy("address")
     st_id = strategy("uint96")
 
-    def __init__(cls, accounts: Accounts, veboost: Contract):
+    def __init__(cls, accounts: Accounts, crv: Contract, veboost: Contract, vecrv: Contract):
         cls.alice = accounts[0]
         cls.accounts = accounts
+        cls.crv = crv
         cls.veboost = veboost
+        cls.vecrv = vecrv
 
     def setup(self):
         self.total_supply = 0
         self.ownership = defaultdict(set)
         self.delegator_tokens = defaultdict(set)
 
+        alice_balance = self.crv.balanceOf(self.alice)
+        dividend = alice_balance // len(self.accounts)
+
+        for acct in self.accounts:
+            self.crv.transfer(acct, dividend, {"from": self.alice})
+
+        for acct in self.accounts:
+            self.crv.approve(self.vecrv, 2 ** 256 - 1, {"from": acct})
+            self.vecrv.create_lock(dividend, chain.time() + 86400 * 365, {"from": acct})
+
     def rule_mint(self, st_addr, st_id):
         token_id = self.veboost.get_token_id(st_addr, st_id)
         if self.veboost.ownerOf(token_id) != ZERO_ADDRESS:
             return
-        self.veboost._mint_for_testing(st_addr, token_id, {"from": st_addr})
+        self.veboost.create_boost(
+            st_addr, st_addr, 5_000, 0, chain.time() + 86400 * 31, st_id, {"from": st_addr}
+        )
 
         self.ownership[st_addr].add(token_id)
         self.delegator_tokens[st_addr].add(token_id)
@@ -41,7 +55,7 @@ class StateMachine:
             convert.to_address(convert.to_bytes(token_id >> 96, "bytes20"))
         )
         _from = self.veboost.ownerOf(token_id)
-        self.veboost._burn_for_testing(token_id, {"from": _from})
+        self.veboost.burn(token_id, {"from": _from})
 
         self.ownership[_from].remove(token_id)
         self.delegator_tokens[delegator].remove(token_id)
@@ -90,5 +104,5 @@ class StateMachine:
             assert tokens == self.delegator_tokens[acct]
 
 
-def test_state_machine(state_machine, accounts, veboost):
-    state_machine(StateMachine, accounts, veboost, settings={"stateful_step_count": 50})
+def test_state_machine(state_machine, accounts, crv, vecrv, veboost):
+    state_machine(StateMachine, accounts, crv, veboost, vecrv, settings={"stateful_step_count": 50})

@@ -22,7 +22,7 @@ def test_extend_an_existing_boost_modify_(
     )
 
     assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5, rel_tol=1e-6)
-    assert veboost.token_expiry(token) == expire_time + expiry_delta
+    assert veboost.token_expiry(token) == ((expire_time + expiry_delta) // WEEK) * WEEK
     assert veboost.token_cancel_time(token) == cancel_time + cancel_delta
 
 
@@ -31,10 +31,10 @@ def test_delegator_operator_can_extend_a_boost(alice, bob, expire_time, veboost,
 
     token = veboost.get_token_id(alice, 0)
     original_boost_value = veboost.token_boost(token)
-    veboost.extend_boost(token, 7_500, expire_time + 1, cancel_time + 1, {"from": alice})
+    veboost.extend_boost(token, 7_500, expire_time + WEEK, cancel_time + 1, {"from": alice})
 
     assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5, rel_tol=10 ** -6)
-    assert veboost.token_expiry(token) == expire_time + 1
+    assert veboost.token_expiry(token) == expire_time + WEEK
     assert veboost.token_cancel_time(token) == cancel_time + 1
 
 
@@ -72,7 +72,9 @@ def test_new_expiry_must_be_greater_than_min_delegation(alice, chain, veboost):
 def test_new_expiry_must_be_less_than_lock_expiry(alice, alice_unlock_time, cancel_time, veboost):
     token = veboost.get_token_id(alice, 0)
     with brownie.reverts(dev_revert_msg="dev: boost expiration is past voting escrow lock expiry"):
-        veboost.extend_boost(token, 7_000, alice_unlock_time + 1, cancel_time, {"from": alice})
+        veboost.extend_boost(
+            token, 7_000, alice_unlock_time + 2 * WEEK, cancel_time, {"from": alice}
+        )
 
 
 def test_expiry_must_be_greater_than_tokens_current_expiry(
@@ -100,13 +102,13 @@ def test_outstanding_negative_boosts_prevent_extending_boosts(
     alice, charlie, chain, expire_time, cancel_time, veboost
 ):
     # give charlie our remaining boost
-    veboost.create_boost(alice, charlie, 10_000, 0, chain.time() + WEEK, 1, {"from": alice})
+    veboost.create_boost(alice, charlie, 10_000, 0, expire_time - WEEK, 1, {"from": alice})
     # fast forward to a day the boost given to charlie has expired
-    chain.mine(timestamp=expire_time - (WEEK + DAY))
+    chain.mine(timestamp=expire_time - WEEK + 1)
 
-    with brownie.reverts(dev_revert_msg="dev: outstanding negative boosts"):
+    with brownie.reverts(dev_revert_msg="dev: negative outstanding boosts"):
         veboost.extend_boost(
-            veboost.get_token_id(alice, 0), 7_000, expire_time, cancel_time, {"from": alice}
+            veboost.get_token_id(alice, 0), 7_000, expire_time + WEEK, cancel_time, {"from": alice}
         )
 
 
@@ -166,14 +168,21 @@ def test_slope_cannot_equal_zero(alice, charlie, chain, crv, vecrv, veboost):
     crv.approve(vecrv, amount * 10, {"from": charlie})
     vecrv.create_lock(amount * 10, unlock_time, {"from": charlie})
     # this should work and be okeay
-    veboost.create_boost(charlie, alice, 10_000, 0, chain.time() + WEEK, 0, {"from": charlie})
+    expire_time = ((chain.time() + WEEK) // WEEK) * WEEK + WEEK
+    veboost.create_boost(
+        charlie,
+        alice,
+        10_000,
+        0,
+        expire_time,
+        0,
+        {"from": charlie},
+    )
 
     # fast forward to when we have very little boost left
-    chain.mine(timestamp=unlock_time - (WEEK + DAY))
+    chain.mine(timestamp=unlock_time - (2 * WEEK))
     with brownie.reverts(dev_revert_msg="dev: invalid slope"):
-        veboost.extend_boost(
-            veboost.get_token_id(charlie, 0), 1, chain.time() + WEEK, 0, {"from": charlie}
-        )
+        veboost.extend_boost(veboost.get_token_id(charlie, 0), 1, unlock_time, 0, {"from": charlie})
 
 
 def test_cannot_extend_non_existent_boost(alice, veboost):

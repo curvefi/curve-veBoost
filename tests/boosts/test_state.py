@@ -175,9 +175,11 @@ class ContractState:
         assert expire_time >= timestamp + WEEK  # expire time greater than min delegation time
         assert _id < 2 ** 96  # id with bounds
 
-        delegated_boost: int = self.boost[delegator].delegated(timestamp)
-        assert delegated_boost >= 0  # no outstanding negative boosts
+        assert all(
+            [t(timestamp) >= 0 for t in self.boost_tokens.values() if t.delegator == delegator]
+        )
 
+        delegated_boost: int = self.boost[delegator].delegated(timestamp)
         y = percentage * (vecrv_balance - delegated_boost) // 10_000
         assert y > 0
 
@@ -222,9 +224,15 @@ class ContractState:
         if cancel_time < token.cancel_time:
             assert timestamp >= token_expiry
 
-        delegated_boost: int = (self.boost[token.delegator].delegated - token)(timestamp)
-        assert delegated_boost >= 0
+        assert all(
+            [
+                t(timestamp) >= 0
+                for t in self.boost_tokens.values()
+                if t.delegator == token.delegator and t != token
+            ]
+        )
 
+        delegated_boost: int = (self.boost[token.delegator].delegated - token)(timestamp)
         y: int = percentage * (vecrv_balance - delegated_boost) // 10_000
         assert y > 0
         assert y >= token_current_value
@@ -249,7 +257,7 @@ class ContractState:
     ):
         token: Token = self.boost_tokens[token_id]
         assert token.owner is not None
-        if not (caller == token.owner or token(timestamp) < 0):
+        if not (caller == token.owner or token(timestamp) <= 0):
             if caller == token.delegator:
                 assert timestamp >= token.cancel_time
             else:

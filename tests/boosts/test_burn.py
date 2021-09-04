@@ -30,3 +30,11 @@ def test_delegator_can_remint_token_id(alice, bob, cancel_time, expire_time, veb
     veboost.create_boost(alice, bob, 10_000, cancel_time, expire_time, 0, {"from": alice})
 
     assert veboost.token_boost(token_id) > 0
+
+
+def test_burn_a_boost_updates_delegator_enumeration(alice, bob, veboost):
+    token_id = veboost.get_token_id(alice, 0)
+    veboost.burn(token_id, {"from": bob})
+
+    assert veboost.total_minted(alice) == 0
+    assert veboost.token_of_delegator_by_index(alice, 0) == 0

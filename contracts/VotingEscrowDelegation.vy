@@ -71,18 +71,22 @@ struct Boost:
     # [bias uint128][slope int128]
     delegated: uint256
     received: uint256
+    # [total active delegations 128][next expiry 128]
+    expiry_data: uint256
 
 struct Token:
     # [bias uint128][slope int128]
     data: uint256
-    cancel_time: uint256
+    # [delegator pos 128][cancel time 128]
+    dinfo: uint256
     # [global 128][local 128]
     position: uint256
+    expire_time: uint256
 
 
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
-MIN_DELEGATION_TIME: constant(uint256) = 86400 * 7
+WEEK: constant(uint256) = 86400 * 7
 VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
 
 
@@ -95,17 +99,22 @@ name: public(String[32])
 symbol: public(String[32])
 base_uri: public(String[128])
 
-boost: HashMap[address, Boost]
-boost_tokens: HashMap[uint256, Token]
-
-admin: public(address)  # Can and will be a smart contract
-future_admin: public(address)
-
 totalSupply: public(uint256)
 # use totalSupply to determine the length
 tokenByIndex: public(HashMap[uint256, uint256])
 # use balanceOf to determine the length
 tokenOfOwnerByIndex: public(HashMap[address, uint256[MAX_UINT256]])
+
+boost: HashMap[address, Boost]
+boost_tokens: HashMap[uint256, Token]
+
+token_of_delegator_by_index: public(HashMap[address, uint256[MAX_UINT256]])
+total_minted: public(HashMap[address, uint256])
+# address => timestamp => # of delegations expiring
+account_expiries: public(HashMap[address, HashMap[uint256, uint256]])
+
+admin: public(address)  # Can and will be a smart contract
+future_admin: public(address)
 
 # The grey list - per-user black and white lists
 # users can make this a blacklist or a whitelist - defaults to blacklist
@@ -146,25 +155,38 @@ def _is_approved_or_owner(_spender: address, _token_id: uint256) -> bool:
 
 @internal
 def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
+    delegator: address = convert(shift(_token_id, -96), address)
     position_data: uint256 = self.boost_tokens[_token_id].position
     local_pos: uint256 = position_data % 2 ** 128
     global_pos: uint256 = shift(position_data, -128)
+    # position in the delegator array of minted tokens
+    delegator_pos: uint256 = shift(self.boost_tokens[_token_id].dinfo, -128)
 
     if _from == ZERO_ADDRESS:
         # minting - This is called before updates to balance and totalSupply
         local_pos = self.balanceOf[_to]
         global_pos = self.totalSupply
         position_data = shift(global_pos, 128) + local_pos
+        # this is a new token so we get the index of a new spot
+        delegator_pos = self.total_minted[delegator]
 
         self.tokenByIndex[global_pos] = _token_id
         self.tokenOfOwnerByIndex[_to][local_pos] = _token_id
         self.boost_tokens[_token_id].position = position_data
+
+        # we only mint tokens in the create_boost fn, and this is called
+        # before we update the cancel_time so we can just set the value
+        # of dinfo to the shifted position
+        self.boost_tokens[_token_id].dinfo = shift(delegator_pos, 128)
+        self.token_of_delegator_by_index[delegator][delegator_pos] = _token_id
+        self.total_minted[delegator] = delegator_pos + 1
 
     elif _to == ZERO_ADDRESS:
         # burning - This is called after updates to balance and totalSupply
         # we operate on both the global array and local array
         last_global_index: uint256 = self.totalSupply
         last_local_index: uint256 = self.balanceOf[_from]
+        last_delegator_pos: uint256 = self.total_minted[delegator] - 1
 
         if global_pos != last_global_index:
             # swap - set the token we're burnings position to the token in the last index
@@ -184,6 +206,16 @@ def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
             self.tokenOfOwnerByIndex[_from][local_pos] = last_local_token
         self.tokenOfOwnerByIndex[_from][last_local_index] = 0
         self.boost_tokens[_token_id].position = 0
+
+        if delegator_pos != last_delegator_pos:
+            last_delegator_token: uint256 = self.token_of_delegator_by_index[delegator][last_delegator_pos]
+            last_delegator_token_dinfo: uint256 = self.boost_tokens[_token_id].dinfo
+            # update the last tokens position data and maintain the correct cancel time
+            self.boost_tokens[last_delegator_pos].dinfo = shift(delegator_pos, 128) + (last_delegator_token_dinfo % 2 ** 128)
+            self.token_of_delegator_by_index[delegator][delegator_pos] = last_delegator_token
+        self.token_of_delegator_by_index[delegator][last_delegator_pos] = 0
+        self.boost_tokens[_token_id].dinfo = 0  # we are burning the token so we can just set to 0
+        self.total_minted[delegator] = last_delegator_pos
 
     else:
         # transfering - called between balance updates
@@ -234,7 +266,7 @@ def _mint(_to: address, _token_id: uint256):
 
 
 @internal
-def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256, _cancel_time: uint256):
+def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256, _cancel_time: uint256, _expire_time: uint256):
     is_whitelist: uint256 = convert(self.grey_list[_receiver][ZERO_ADDRESS], uint256)
     delegator_status: uint256 = convert(self.grey_list[_receiver][_delegator], uint256)
     assert not convert(bitwise_xor(is_whitelist, delegator_status), bool)  # dev: mint boost not allowed
@@ -245,7 +277,8 @@ def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
 
     token: Token = self.boost_tokens[_token_id]
     token.data = data
-    token.cancel_time = _cancel_time
+    token.dinfo = token.dinfo + _cancel_time
+    token.expire_time = _expire_time
     self.boost_tokens[_token_id] = token
 
 
@@ -256,9 +289,42 @@ def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
     self.boost[_receiver].received -= data
 
     token: Token = self.boost_tokens[_token_id]
+    expire_time: uint256 = token.expire_time
+
     token.data = 0
-    token.cancel_time = 0
+    # maintain the same position in the delegator array, but remove the cancel time
+    token.dinfo = shift(token.dinfo / 2 ** 128, 128)
+    token.expire_time = 0
     self.boost_tokens[_token_id] = token
+
+    # update the next expiry data
+    expiry_data: uint256 = self.boost[_delegator].expiry_data
+    next_expiry: uint256 = expiry_data % 2 ** 128
+    active_delegations: uint256 = shift(expiry_data, -128) - 1
+
+    expiries: uint256 = self.account_expiries[_delegator][expire_time]
+
+    if active_delegations != 0 and expire_time == next_expiry and expiries == 0:
+        # Will be passed if
+        # active_delegations == 0, no more active boost tokens
+        # or
+        # expire_time != next_expiry, the cancelled boost token isn't the next expiring boost token
+        # or
+        # expiries != 0, the cancelled boost token isn't the only one expiring at expire_time
+        for i in range(1, 513):  # ~10 years
+            # we essentially allow for a boost token be expired for up to 6 years
+            # 10 yrs - 4 yrs (max vecRV lock time) = ~ 6 yrs
+            if i == 512:
+                raise "Failed to find next expiry"
+            week_ts: uint256 = expire_time + WEEK * (i + 1)
+            if self.account_expiries[_delegator][week_ts] > 0:
+                next_expiry = week_ts
+                break
+    elif active_delegations == 0:
+        next_expiry = 0
+
+    self.boost[_delegator].expiry_data = shift(active_delegations, 128) + next_expiry
+    self.account_expiries[_delegator][expire_time] = expiries - 1
 
 
 @internal
@@ -333,10 +399,10 @@ def _cancel_boost(_token_id: uint256, _caller: address):
     tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
 
     # if not (the owner or operator or the boost value is negative)
-    if not (_caller == receiver or self.isApprovedForAll[receiver][_caller] or tvalue < 0):
+    if not (_caller == receiver or self.isApprovedForAll[receiver][_caller] or tvalue <= 0):
         if _caller == delegator or self.isApprovedForAll[delegator][_caller]:
             # if delegator or operator, wait till after cancel time
-            assert token.cancel_time <= block.timestamp  # dev: must wait for cancel time
+            assert (token.dinfo % 2 ** 128) <= block.timestamp  # dev: must wait for cancel time
         else:
             # All others are disallowed
             raise "Not allowed!"
@@ -531,15 +597,26 @@ def create_boost(
     @param _id The token id, within the range of [0, 2 ** 56)
     """
     assert msg.sender == _delegator or self.isApprovedForAll[_delegator][msg.sender]  # dev: only delegator or operator
+
+    expire_time: uint256 = (_expire_time / WEEK) * WEEK
+
+    expiry_data: uint256 = self.boost[_delegator].expiry_data
+    next_expiry: uint256 = expiry_data % 2 ** 128
+    active_delegations: uint256 = shift(expiry_data, -128)
+
+    if next_expiry == 0:
+        next_expiry = MAX_UINT256
+
+    assert block.timestamp < next_expiry  # dev: negative boost token is in circulation
     assert _percentage > 0  # dev: percentage must be greater than 0 bps
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
-    assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
+    assert _cancel_time <= expire_time  # dev: cancel time is after expiry
 
     # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(_delegator)
 
-    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast MIN_DELEGATION_TIME
-    assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
+    assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast WEEK
+    assert expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
     assert _id < 2 ** 96  # dev: id out of bounds
 
     # [delegator address 160][cancel_time uint40][id uint56]
@@ -555,20 +632,26 @@ def create_boost(
     dbias: int256 = 0
     dbias, dslope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
 
-    # verify delegated boost isn't negative, else it'll inflate out vecrv balance
+    # delegated boost will be positive, if any of circulating boosts are negative
+    # we have already reverted
     delegated_boost: int256 = dslope * time + dbias
-    assert delegated_boost >= 0  # dev: outstanding negative boosts
-
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
     slope: int256 = 0
     bias: int256 = 0
-    bias, slope = self._calc_bias_slope(time, y, convert(_expire_time, int256))
+    bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
 
     assert slope < 0  # dev: invalid slope
 
-    self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time)
+    self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time, expire_time)
+
+    # increase the number of expiries for the user
+    if expire_time < next_expiry:
+        next_expiry = expire_time
+
+    self.account_expiries[_delegator][expire_time] += 1
+    self.boost[_delegator].expiry_data = shift(active_delegations + 1, 128) + next_expiry
 
     log DelegateBoost(_delegator, _receiver, token_id, convert(y, uint256), _cancel_time, _expire_time)
 
@@ -600,9 +683,11 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(delegator)
     token: Token = self.boost_tokens[_token_id]
 
-    assert _cancel_time <= _expire_time  # dev: cancel time is after expiry
-    assert _expire_time >= block.timestamp + MIN_DELEGATION_TIME  # dev: boost duration must be atleast one day
-    assert _expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
+    expire_time: uint256 = (_expire_time / WEEK) * WEEK
+
+    assert _cancel_time <= expire_time  # dev: cancel time is after expiry
+    assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast one day
+    assert expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
 
     time: int256 = convert(block.timestamp, int256)
     vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(delegator), int256)
@@ -614,17 +699,27 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     # assert the new expiry is ahead of the already existing expiry, otherwise
     # this isn't really an extension
-    token_expiry: uint256 = convert(-tbias / tslope, uint256)
+    token_expiry: uint256 = token.expire_time
 
     # Can extend a token by increasing it's amount but not it's expiry time
-    assert _expire_time >= token_expiry  # dev: new expiration must be greater than old token expiry
+    assert expire_time >= token_expiry  # dev: new expiration must be greater than old token expiry
 
     # if we are extending an unexpired boost, the cancel time must the same or greater
     # else we can adjust the cancel time to our preference
-    if _cancel_time < token.cancel_time:
+    if _cancel_time < (token.dinfo % 2 ** 128):
         assert block.timestamp >= token_expiry  # dev: cancel time reduction disallowed
 
+    # storage variables have been updated: next_expiry + active_delegations
     self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+
+    expiry_data: uint256 = self.boost[delegator].expiry_data
+    next_expiry: uint256 = expiry_data % 2 ** 128
+    active_delegations: uint256 = shift(expiry_data, -128)
+
+    if next_expiry == 0:
+        next_expiry = MAX_UINT256
+
+    assert block.timestamp < next_expiry  # dev: negative outstanding boosts
 
     # delegated slope and bias
     dslope: int256 = 0
@@ -633,8 +728,6 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     # verify delegated boost isn't negative, else it'll inflate out vecrv balance
     delegated_boost: int256 = dslope * time + dbias
-    assert delegated_boost >= 0  # dev: outstanding negative boosts
-
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     # a delegator can snipe the exact moment a token expires and create a boost
     # with 10_000 or some percentage of their boost, which is perfectly fine.
@@ -646,13 +739,20 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     slope: int256 = 0
     bias: int256 = 0
-    bias, slope = self._calc_bias_slope(time, y, convert(_expire_time, int256))
+    bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
 
     assert slope < 0  # dev: invalid slope
 
-    self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time)
+    self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time, expire_time)
 
-    log ExtendBoost(delegator, receiver, _token_id, convert(y, uint256), _expire_time, _cancel_time)
+    # increase the number of expiries for the user
+    if expire_time < next_expiry:
+        next_expiry = expire_time
+
+    self.account_expiries[delegator][expire_time] += 1
+    self.boost[delegator].expiry_data = shift(active_delegations + 1, 128) + next_expiry
+
+    log ExtendBoost(delegator, receiver, _token_id, convert(y, uint256), expire_time, _cancel_time)
 
 
 @external
@@ -730,6 +830,14 @@ def adjusted_balance_of(_account: address) -> uint256:
     @dev If boosts/delegations have a negative value, they're effective value is 0
     @param _account The account to query the adjusted balance of
     """
+    next_expiry: uint256 = self.boost[_account].expiry_data % 2 ** 128
+    if next_expiry < block.timestamp and next_expiry != 0:
+        # if the account has a negative boost in circulation
+        # we over penalize by setting their adjusted balance to 0
+        # this is because we don't want to iterate to find the real
+        # value
+        return 0
+
     vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_account), int256)
 
     boost: Boost = self.boost[_account]
@@ -834,13 +942,7 @@ def token_expiry(_token_id: uint256) -> uint256:
         date.
     @param _token_id The token id to query
     """
-    tslope: int256 = 0
-    tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
-    # y = mx + b -> (y - b) / m = x -> (0 - b)/m = x
-    if tslope == 0:
-        return 0
-    return convert(-tbias/tslope, uint256)
+    return self.boost_tokens[_token_id].expire_time
 
 
 @view
@@ -853,7 +955,7 @@ def token_cancel_time(_token_id: uint256) -> uint256:
         after it's expiration.
     @param _token_id The token id to query
     """
-    return self.boost_tokens[_token_id].cancel_time
+    return self.boost_tokens[_token_id].dinfo % 2 ** 128
 
 
 @view
@@ -862,7 +964,7 @@ def calc_boost_bias_slope(
     _delegator: address,
     _percentage: int256,
     _expire_time: int256,
-    _extend_token_id: uint256 = 2 ** 96
+    _extend_token_id: uint256 = 0
 ) -> (int256, int256):
     """
     @notice Calculate the bias and slope for a boost.
@@ -881,7 +983,7 @@ def calc_boost_bias_slope(
     time: int256 = convert(block.timestamp, int256)
     assert _percentage > 0  # dev: percentage must be greater than 0
     assert _percentage <= MAX_PCT  # dev: percentage must be less than or equal to 100%
-    assert _expire_time > time + MIN_DELEGATION_TIME  # dev: Invalid min expiry time
+    assert _expire_time > time + WEEK  # dev: Invalid min expiry time
 
     lock_expiry: int256 = convert(VotingEscrow(VOTING_ESCROW).locked__end(_delegator), int256)
     assert _expire_time <= lock_expiry
@@ -890,7 +992,7 @@ def calc_boost_bias_slope(
 
     ddata: uint256 = self.boost[_delegator].delegated
 
-    if _extend_token_id < 2 ** 96 and convert(shift(_extend_token_id, -96), address) == _delegator:
+    if _extend_token_id != 0 and convert(shift(_extend_token_id, -96), address) == _delegator:
         # decrease the delegated bias and slope by the token's bias and slope
         # only if it is the delegator's and it is within the bounds of existence
         ddata -= self.boost_tokens[_extend_token_id].data

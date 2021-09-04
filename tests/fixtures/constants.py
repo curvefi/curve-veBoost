@@ -28,7 +28,7 @@ def bob_unlock_time(chain):
 @pytest.fixture
 def expire_time(alice_unlock_time, chain):
     now = chain.time()
-    return now + (alice_unlock_time - now) // 2
+    return ((now + (alice_unlock_time - now) // 2) // WEEK) * WEEK
 
 
 @pytest.fixture

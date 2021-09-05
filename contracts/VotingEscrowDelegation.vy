@@ -590,8 +590,10 @@ def create_boost(
         can cancel the delegated boost
     @param _expire_time The point in time, atleast a day in the future, at which the value of the boost
         will reach 0. After which the negative value is deducted from the delegator's account (and the
-        receiver's received boost only) until it is cancelled
-    @param _id The token id, within the range of [0, 2 ** 56)
+        receiver's received boost only) until it is cancelled. This value is rounded down to the nearest
+        WEEK.
+    @param _id The token id, within the range of [0, 2 ** 96). Useful for contracts given operator status
+        to have specific ranges.
     """
     assert msg.sender == _delegator or self.isApprovedForAll[_delegator][msg.sender]  # dev: only delegator or operator
 
@@ -656,8 +658,8 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
         AFTER burning the token's current boost
     @param _expire_time The new time at which the boost value will become
         0, and eventually negative. Must be greater than the previous expiry time,
-        and atleast a day from now, and less than the veCRV lock expiry of the
-        delegator's account.
+        and atleast a WEEK from now, and less than the veCRV lock expiry of the
+        delegator's account. This value is rounded down to the nearest WEEK.
     """
     delegator: address = convert(shift(_token_id, -96), address)
     receiver: address = self.ownerOf[_token_id]

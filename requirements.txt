@@ -8,10 +8,6 @@ aiohttp==3.7.4.post0
     # via
     #   eth-brownie
     #   web3
-appdirs==1.4.4
-    # via
-    #   black
-    #   eth-brownie
 asttokens==2.0.4
     # via
     #   eth-brownie
@@ -37,7 +33,7 @@ bitarray==1.2.2
     # via
     #   eth-account
     #   eth-brownie
-black==21.7b0
+black==21.8b0
     # via
     #   -r requirements.in
     #   eth-brownie
@@ -84,11 +80,11 @@ eth-account==0.5.5
     # via
     #   eth-brownie
     #   web3
-eth-brownie==1.16.2
+eth-brownie==1.16.3
     # via -r requirements.in
 eth-event==1.2.3
     # via eth-brownie
-eth-hash[pycryptodome]==0.3.1
+eth-hash[pycryptodome]==0.3.2
     # via
     #   eth-brownie
     #   eth-event
@@ -122,7 +118,6 @@ eth-utils==1.10.0
     #   eth-account
     #   eth-brownie
     #   eth-event
-    #   eth-hash
     #   eth-keyfile
     #   eth-keys
     #   eth-rlp
@@ -136,7 +131,7 @@ filelock==3.0.12
     # via virtualenv
 flake8==3.9.2
     # via -r requirements.in
-hexbytes==0.2.1
+hexbytes==0.2.2
     # via
     #   eip712
     #   eth-account
@@ -144,7 +139,7 @@ hexbytes==0.2.1
     #   eth-event
     #   eth-rlp
     #   web3
-hypothesis==6.15.0
+hypothesis==6.17.4
     # via eth-brownie
 identify==2.2.13
     # via pre-commit
@@ -162,7 +157,7 @@ iniconfig==1.1.1
     # via
     #   eth-brownie
     #   pytest
-ipfshttpclient==0.7.0
+ipfshttpclient==0.8.0a2
     # via
     #   eth-brownie
     #   web3
@@ -225,12 +220,15 @@ pep517==0.11.0
 pip-tools==6.2.0
     # via -r requirements.in
 platformdirs==2.3.0
-    # via virtualenv
-pluggy==0.13.1
+    # via
+    #   black
+    #   eth-brownie
+    #   virtualenv
+pluggy==1.0.0
     # via
     #   eth-brownie
     #   pytest
-pre-commit==2.14.1
+pre-commit==2.15.0
     # via -r requirements.in
 prompt-toolkit==3.0.20
     # via eth-brownie
@@ -278,7 +276,7 @@ pyrsistent==0.18.0
     # via
     #   eth-brownie
     #   jsonschema
-pytest==6.2.4
+pytest==6.2.5
     # via
     #   eth-brownie
     #   pytest-forked
@@ -302,7 +300,7 @@ pyyaml==5.4.1
     # via
     #   eth-brownie
     #   pre-commit
-regex==2021.8.21
+regex==2021.8.28
     # via
     #   black
     #   eth-brownie
@@ -356,9 +354,10 @@ toolz==0.11.1
     #   eth-brownie
 tqdm==4.62.2
     # via eth-brownie
-typing-extensions==3.10.0.0
+typing-extensions==3.10.0.2
     # via
     #   aiohttp
+    #   black
     #   eth-brownie
 urllib3==1.26.6
     # via
@@ -372,13 +371,13 @@ virtualenv==20.7.2
     # via pre-commit
 vvm==0.1.0
     # via eth-brownie
-vyper==0.2.15
+vyper==0.2.16
     # via eth-brownie
 wcwidth==0.2.5
     # via
     #   eth-brownie
     #   prompt-toolkit
-web3==5.23.0
+web3==5.23.1
     # via eth-brownie
 websockets==9.1
     # via

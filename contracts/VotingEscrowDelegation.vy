@@ -1,4 +1,4 @@
-# @version 0.2.15
+# @version 0.2.16
 """
 @title Voting Escrow Delegation
 @author Curve Finance
@@ -602,7 +602,6 @@ def create_boost(
 
     expiry_data: uint256 = self.boost[_delegator].expiry_data
     next_expiry: uint256 = expiry_data % 2 ** 128
-    active_delegations: uint256 = shift(expiry_data, -128)
 
     if next_expiry == 0:
         next_expiry = MAX_UINT256
@@ -612,11 +611,8 @@ def create_boost(
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
     assert _cancel_time <= expire_time  # dev: cancel time is after expiry
 
-    # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
-    lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(_delegator)
-
     assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast WEEK
-    assert expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
+    assert expire_time <= VotingEscrow(VOTING_ESCROW).locked__end(_delegator)  # dev: boost expiration is past voting escrow lock expiry
     assert _id < 2 ** 96  # dev: id out of bounds
 
     # [delegator address 160][cancel_time uint40][id uint56]
@@ -624,24 +620,21 @@ def create_boost(
     # check if the token exists here before we expend more gas by minting it
     self._mint(_receiver, token_id)
 
+    # delegated slope and bias
+    slope: int256 = 0
+    bias: int256 = 0
+    bias, slope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
+
     time: int256 = convert(block.timestamp, int256)
     vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_delegator), int256)
 
-    # delegated slope and bias
-    dslope: int256 = 0
-    dbias: int256 = 0
-    dbias, dslope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
-
     # delegated boost will be positive, if any of circulating boosts are negative
     # we have already reverted
-    delegated_boost: int256 = dslope * time + dbias
+    delegated_boost: int256 = slope * time + bias
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
-    slope: int256 = 0
-    bias: int256 = 0
     bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
-
     assert slope < 0  # dev: invalid slope
 
     self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time, expire_time)
@@ -650,6 +643,7 @@ def create_boost(
     if expire_time < next_expiry:
         next_expiry = expire_time
 
+    active_delegations: uint256 = shift(expiry_data, -128)
     self.account_expiries[_delegator][expire_time] += 1
     self.boost[_delegator].expiry_data = shift(active_delegations + 1, 128) + next_expiry
 

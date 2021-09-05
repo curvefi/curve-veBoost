@@ -213,9 +213,9 @@ def _update_enumeration_data(_from: address, _to: address, _token_id: uint256):
 
         if delegator_pos != last_delegator_pos:
             last_delegator_token: uint256 = self.token_of_delegator_by_index[delegator][last_delegator_pos]
-            last_delegator_token_dinfo: uint256 = self.boost_tokens[_token_id].dinfo
+            last_delegator_token_dinfo: uint256 = self.boost_tokens[last_delegator_token].dinfo
             # update the last tokens position data and maintain the correct cancel time
-            self.boost_tokens[last_delegator_pos].dinfo = shift(delegator_pos, 128) + (last_delegator_token_dinfo % 2 ** 128)
+            self.boost_tokens[last_delegator_token].dinfo = shift(delegator_pos, 128) + (last_delegator_token_dinfo % 2 ** 128)
             self.token_of_delegator_by_index[delegator][delegator_pos] = last_delegator_token
         self.token_of_delegator_by_index[delegator][last_delegator_pos] = 0
         self.boost_tokens[_token_id].dinfo = 0  # we are burning the token so we can just set to 0

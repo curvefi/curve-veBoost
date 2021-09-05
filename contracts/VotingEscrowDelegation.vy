@@ -14,7 +14,7 @@ interface ERC721Receiver:
         nonpayable
 
 interface VotingEscrow:
-    def balanceOf(_account: address) -> uint256: view
+    def balanceOf(_account: address) -> int256: view
     def locked__end(_addr: address) -> uint256: view
 
 
@@ -626,12 +626,11 @@ def create_boost(
     bias, slope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
 
     time: int256 = convert(block.timestamp, int256)
-    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_delegator), int256)
 
     # delegated boost will be positive, if any of circulating boosts are negative
     # we have already reverted
     delegated_boost: int256 = slope * time + bias
-    y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
+    y: int256 = _percentage * (VotingEscrow(VOTING_ESCROW).balanceOf(_delegator) - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
     bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
@@ -713,8 +712,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     # verify delegated boost isn't negative, else it'll inflate out vecrv balance
     delegated_boost: int256 = slope * time + bias
-    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(delegator), int256)
-    y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
+    y: int256 = _percentage * (VotingEscrow(VOTING_ESCROW).balanceOf(delegator) - delegated_boost) / MAX_PCT
     # a delegator can snipe the exact moment a token expires and create a boost
     # with 10_000 or some percentage of their boost, which is perfectly fine.
     # this check is here so the user can't extend a boost unless they actually
@@ -821,7 +819,7 @@ def adjusted_balance_of(_account: address) -> uint256:
         # value
         return 0
 
-    adjusted_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_account), int256)
+    adjusted_balance: int256 = VotingEscrow(VOTING_ESCROW).balanceOf(_account)
 
     boost: Boost = self.boost[_account]
     time: int256 = convert(block.timestamp, int256)
@@ -965,8 +963,6 @@ def calc_boost_bias_slope(
     lock_expiry: int256 = convert(VotingEscrow(VOTING_ESCROW).locked__end(_delegator), int256)
     assert _expire_time <= lock_expiry
 
-    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(_delegator), int256)
-
     ddata: uint256 = self.boost[_delegator].delegated
 
     if _extend_token_id != 0 and convert(shift(_extend_token_id, -96), address) == _delegator:
@@ -981,7 +977,7 @@ def calc_boost_bias_slope(
     delegated_boost: int256 = dslope * time + dbias
     assert delegated_boost >= 0  # dev: outstanding negative boosts
 
-    y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
+    y: int256 = _percentage * (VotingEscrow(VOTING_ESCROW).balanceOf(_delegator) - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
     slope: int256 = -y / (_expire_time - time)

@@ -674,41 +674,34 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     assert _percentage <= MAX_PCT  # dev: percentage must be less than 10_000 bps
 
     # timestamp when delegating account's voting escrow ends - also our second point (lock_expiry, 0)
-    lock_expiry: uint256 = VotingEscrow(VOTING_ESCROW).locked__end(delegator)
     token: Token = self.boost_tokens[_token_id]
 
     expire_time: uint256 = (_expire_time / WEEK) * WEEK
 
     assert _cancel_time <= expire_time  # dev: cancel time is after expiry
     assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast one day
-    assert expire_time <= lock_expiry # dev: boost expiration is past voting escrow lock expiry
+    assert expire_time <= VotingEscrow(VOTING_ESCROW).locked__end(delegator) # dev: boost expiration is past voting escrow lock expiry
+
+    slope: int256 = 0
+    bias: int256 = 0
+    bias, slope = self._deconstruct_bias_slope(token.data)
 
     time: int256 = convert(block.timestamp, int256)
-    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(delegator), int256)
-
-    tslope: int256 = 0
-    tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(token.data)
-    tvalue: int256 = tslope * time + tbias
-
-    # assert the new expiry is ahead of the already existing expiry, otherwise
-    # this isn't really an extension
-    token_expiry: uint256 = token.expire_time
+    tvalue: int256 = slope * time + bias
 
     # Can extend a token by increasing it's amount but not it's expiry time
-    assert expire_time >= token_expiry  # dev: new expiration must be greater than old token expiry
+    assert expire_time >= token.expire_time  # dev: new expiration must be greater than old token expiry
 
     # if we are extending an unexpired boost, the cancel time must the same or greater
     # else we can adjust the cancel time to our preference
     if _cancel_time < (token.dinfo % 2 ** 128):
-        assert block.timestamp >= token_expiry  # dev: cancel time reduction disallowed
+        assert block.timestamp >= token.expire_time  # dev: cancel time reduction disallowed
 
     # storage variables have been updated: next_expiry + active_delegations
-    self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+    self._burn_boost(_token_id, delegator, receiver, bias, slope)
 
     expiry_data: uint256 = self.boost[delegator].expiry_data
     next_expiry: uint256 = expiry_data % 2 ** 128
-    active_delegations: uint256 = shift(expiry_data, -128)
 
     if next_expiry == 0:
         next_expiry = MAX_UINT256
@@ -716,25 +709,20 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     assert block.timestamp < next_expiry  # dev: negative outstanding boosts
 
     # delegated slope and bias
-    dslope: int256 = 0
-    dbias: int256 = 0
-    dbias, dslope = self._deconstruct_bias_slope(self.boost[delegator].delegated)
+    bias, slope = self._deconstruct_bias_slope(self.boost[delegator].delegated)
 
     # verify delegated boost isn't negative, else it'll inflate out vecrv balance
-    delegated_boost: int256 = dslope * time + dbias
+    delegated_boost: int256 = slope * time + bias
+    vecrv_balance: int256 = convert(VotingEscrow(VOTING_ESCROW).balanceOf(delegator), int256)
     y: int256 = _percentage * (vecrv_balance - delegated_boost) / MAX_PCT
     # a delegator can snipe the exact moment a token expires and create a boost
     # with 10_000 or some percentage of their boost, which is perfectly fine.
     # this check is here so the user can't extend a boost unless they actually
     # have any to give
     assert y > 0  # dev: no boost
-
     assert y >= tvalue  # dev: cannot reduce value of boost
 
-    slope: int256 = 0
-    bias: int256 = 0
     bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
-
     assert slope < 0  # dev: invalid slope
 
     self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time, expire_time)
@@ -743,6 +731,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     if expire_time < next_expiry:
         next_expiry = expire_time
 
+    active_delegations: uint256 = shift(expiry_data, -128)
     self.account_expiries[delegator][expire_time] += 1
     self.boost[delegator].expiry_data = shift(active_delegations + 1, 128) + next_expiry
 

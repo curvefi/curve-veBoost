@@ -296,6 +296,15 @@ class ContractState:
                 self.boost_tokens[token_id].owner = _to
 
     def adjusted_balance_of(self, account: Account, timestamp: int, vecrv_balance: int) -> int:
+        if any(
+            [
+                token(timestamp) < 0
+                for token in self.boost_tokens.values()
+                if token.delegator == account
+            ]
+        ):
+            return 0
+
         delegated = self.boost[account].delegated(timestamp)
         received = self.boost[account].received(timestamp)
         balance = vecrv_balance - abs(delegated) + max(received, 0)
@@ -304,6 +313,10 @@ class ContractState:
     @staticmethod
     def get_token_id(account: str, _id: int) -> int:
         return (convert.to_uint(account) << 96) + _id
+
+    @staticmethod
+    def round_to_nearest_week(time: int) -> int:
+        return (time // WEEK) * WEEK
 
 
 class StateMachine:
@@ -348,13 +361,14 @@ class StateMachine:
 
         _id = (set(range(10000)) - self.delegator_ids[delegator]).pop()
         self.delegator_ids[delegator].add(_id)
+        time = self.state.round_to_nearest_week(int(expire_time + chain.time()))
         try:
             self.state.create_boost(
                 delegator,
                 receiver,
                 percentage,
-                int(expire_time + chain.time()),
-                int(expire_time + chain.time()),
+                time,
+                time,
                 _id,
                 int(chain.time()),
                 vecrv_balance,
@@ -366,8 +380,8 @@ class StateMachine:
                     delegator,
                     receiver,
                     percentage,
-                    int(expire_time + chain.time()),
-                    int(expire_time + chain.time()),
+                    time,
+                    time,
                     _id,
                     {"from": delegator},
                 )
@@ -376,8 +390,8 @@ class StateMachine:
                 delegator,
                 receiver,
                 percentage,
-                int(expire_time + chain.time()),
-                int(expire_time + chain.time()),
+                time,
+                time,
                 _id,
                 {"from": delegator},
             )
@@ -388,8 +402,8 @@ class StateMachine:
                 delegator,
                 receiver,
                 percentage,
-                int(tx.timestamp + expire_time),
-                int(tx.timestamp + expire_time),
+                time,
+                time,
                 _id,
                 tx.timestamp,
                 vecrv_balance,
@@ -410,6 +424,7 @@ class StateMachine:
         _id = self.delegator_ids[delegator].pop()
         token_id = self.state.get_token_id(delegator.address, _id)
 
+        time = self.state.round_to_nearest_week(int(expire_time + chain.time()))
         with brownie.multicall(block_identifier=chain.height):
             vecrv_balance = self.vecrv.balanceOf(delegator)
             lock_expiry = self.vecrv.locked__end(delegator)
@@ -418,8 +433,8 @@ class StateMachine:
             self.state.extend_boost(
                 token_id,
                 pct,
-                int(chain.time() + expire_time),
-                int(chain.time() + expire_time),
+                time,
+                time,
                 int(chain.time()),
                 vecrv_balance,
                 lock_expiry,
@@ -429,16 +444,16 @@ class StateMachine:
                 self.veboost.extend_boost(
                     token_id,
                     pct,
-                    int(chain.time() + expire_time),
-                    int(chain.time() + expire_time),
+                    time,
+                    time,
                     {"from": self.state.boost_tokens[token_id].delegator or self.accounts[0]},
                 )
         else:
             tx = self.veboost.extend_boost(
                 token_id,
                 pct,
-                int(chain.time() + expire_time),
-                int(chain.time() + expire_time),
+                time,
+                time,
                 {"from": self.state.boost_tokens[token_id].delegator},
             )
             with brownie.multicall(block_identifier=tx.block_number):
@@ -448,8 +463,8 @@ class StateMachine:
             self.state.extend_boost(
                 token_id,
                 pct,
-                int(tx.timestamp + expire_time),
-                int(tx.timestamp + expire_time),
+                time,
+                time,
                 tx.timestamp,
                 vecrv_balance,
                 lock_expiry,

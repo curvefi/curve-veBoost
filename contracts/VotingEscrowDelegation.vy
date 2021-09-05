@@ -83,6 +83,10 @@ struct Token:
     position: uint256
     expire_time: uint256
 
+struct Point:
+    bias: int256
+    slope: int256
+
 
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
@@ -336,17 +340,17 @@ def _transfer_boost(_from: address, _to: address, _bias: int256, _slope: int256)
 
 @pure
 @internal
-def _deconstruct_bias_slope(_data: uint256) -> (int256, int256):
-    return convert(shift(_data, -128), int256), -convert(_data % 2 ** 128, int256)
+def _deconstruct_bias_slope(_data: uint256) -> Point:
+    return Point({bias: convert(shift(_data, -128), int256), slope: -convert(_data % 2 ** 128, int256)})
 
 
 @pure
 @internal
-def _calc_bias_slope(_x: int256, _y: int256, _expire_time: int256) -> (int256, int256):
+def _calc_bias_slope(_x: int256, _y: int256, _expire_time: int256) -> Point:
     # SLOPE: (y2 - y1) / (x2 - x1)
     # BIAS: y = mx + b -> y - mx = b
     slope: int256 = -_y / (_expire_time - _x)
-    return _y - slope * _x, slope
+    return Point({bias: _y - slope * _x, slope: slope})
 
 
 @internal
@@ -367,20 +371,17 @@ def _transfer(_from: address, _to: address, _token_id: uint256):
     self.balanceOf[_to] += 1
     self.ownerOf[_token_id] = _to
 
-    tbias: int256 = 0
-    tslope: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
-
-    tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
+    tpoint: Point = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
+    tvalue: int256 = tpoint.slope * convert(block.timestamp, int256) + tpoint.bias
 
     # if the boost value is negative, reset the slope and bias
     if tvalue > 0:
-        self._transfer_boost(_from, _to, tbias, tslope)
+        self._transfer_boost(_from, _to, tpoint.bias, tpoint.slope)
         # y = mx + b -> y - b = mx -> (y - b)/m = x -> -b / m = x (x-intercept)
-        expiry: uint256 = convert(-tbias / tslope, uint256)
+        expiry: uint256 = convert(-tpoint.bias / tpoint.slope, uint256)
         log TransferBoost(_from, _to, _token_id, convert(tvalue, uint256), expiry)
     else:
-        self._burn_boost(_token_id, delegator, _from, tbias, tslope)
+        self._burn_boost(_token_id, delegator, _from, tpoint.bias, tpoint.slope)
         log BurnBoost(delegator, _from, _token_id)
 
     log Transfer(_from, _to, _token_id)
@@ -393,10 +394,8 @@ def _cancel_boost(_token_id: uint256, _caller: address):
     delegator: address = convert(shift(_token_id, -96), address)
 
     token: Token = self.boost_tokens[_token_id]
-    tslope: int256 = 0
-    tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(token.data)
-    tvalue: int256 = tslope * convert(block.timestamp, int256) + tbias
+    tpoint: Point = self._deconstruct_bias_slope(token.data)
+    tvalue: int256 = tpoint.slope * convert(block.timestamp, int256) + tpoint.bias
 
     # if not (the owner or operator or the boost value is negative)
     if not (_caller == receiver or self.isApprovedForAll[receiver][_caller] or tvalue <= 0):
@@ -406,7 +405,7 @@ def _cancel_boost(_token_id: uint256, _caller: address):
         else:
             # All others are disallowed
             raise "Not allowed!"
-    self._burn_boost(_token_id, delegator, receiver, tbias, tslope)
+    self._burn_boost(_token_id, delegator, receiver, tpoint.bias, tpoint.slope)
 
     log BurnBoost(delegator, receiver, _token_id)
 
@@ -539,14 +538,12 @@ def burn(_token_id: uint256):
 
     tdata: uint256 = self.boost_tokens[_token_id].data
     if tdata != 0:
-        tslope: int256 = 0
-        tbias: int256 = 0
-        tbias, tslope = self._deconstruct_bias_slope(tdata)
+        tpoint: Point = self._deconstruct_bias_slope(tdata)
 
         delegator: address = convert(shift(_token_id, -96), address)
         owner: address = self.ownerOf[_token_id]
 
-        self._burn_boost(_token_id, delegator, owner, tbias, tslope)
+        self._burn_boost(_token_id, delegator, owner, tpoint.bias, tpoint.slope)
 
         log BurnBoost(delegator, owner, _token_id)
 
@@ -621,22 +618,20 @@ def create_boost(
     self._mint(_receiver, token_id)
 
     # delegated slope and bias
-    slope: int256 = 0
-    bias: int256 = 0
-    bias, slope = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
+    point: Point = self._deconstruct_bias_slope(self.boost[_delegator].delegated)
 
     time: int256 = convert(block.timestamp, int256)
 
     # delegated boost will be positive, if any of circulating boosts are negative
     # we have already reverted
-    delegated_boost: int256 = slope * time + bias
+    delegated_boost: int256 = point.slope * time + point.bias
     y: int256 = _percentage * (VotingEscrow(VOTING_ESCROW).balanceOf(_delegator) - delegated_boost) / MAX_PCT
     assert y > 0  # dev: no boost
 
-    bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
-    assert slope < 0  # dev: invalid slope
+    point = self._calc_bias_slope(time, y, convert(expire_time, int256))
+    assert point.slope < 0  # dev: invalid slope
 
-    self._mint_boost(token_id, _delegator, _receiver, bias, slope, _cancel_time, expire_time)
+    self._mint_boost(token_id, _delegator, _receiver, point.bias, point.slope, _cancel_time, expire_time)
 
     # increase the number of expiries for the user
     if expire_time < next_expiry:
@@ -681,12 +676,10 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast one day
     assert expire_time <= VotingEscrow(VOTING_ESCROW).locked__end(delegator) # dev: boost expiration is past voting escrow lock expiry
 
-    slope: int256 = 0
-    bias: int256 = 0
-    bias, slope = self._deconstruct_bias_slope(token.data)
+    point: Point = self._deconstruct_bias_slope(token.data)
 
     time: int256 = convert(block.timestamp, int256)
-    tvalue: int256 = slope * time + bias
+    tvalue: int256 = point.slope * time + point.bias
 
     # Can extend a token by increasing it's amount but not it's expiry time
     assert expire_time >= token.expire_time  # dev: new expiration must be greater than old token expiry
@@ -697,7 +690,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
         assert block.timestamp >= token.expire_time  # dev: cancel time reduction disallowed
 
     # storage variables have been updated: next_expiry + active_delegations
-    self._burn_boost(_token_id, delegator, receiver, bias, slope)
+    self._burn_boost(_token_id, delegator, receiver, point.bias, point.slope)
 
     expiry_data: uint256 = self.boost[delegator].expiry_data
     next_expiry: uint256 = expiry_data % 2 ** 128
@@ -708,10 +701,10 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     assert block.timestamp < next_expiry  # dev: negative outstanding boosts
 
     # delegated slope and bias
-    bias, slope = self._deconstruct_bias_slope(self.boost[delegator].delegated)
+    point = self._deconstruct_bias_slope(self.boost[delegator].delegated)
 
     # verify delegated boost isn't negative, else it'll inflate out vecrv balance
-    delegated_boost: int256 = slope * time + bias
+    delegated_boost: int256 = point.slope * time + point.bias
     y: int256 = _percentage * (VotingEscrow(VOTING_ESCROW).balanceOf(delegator) - delegated_boost) / MAX_PCT
     # a delegator can snipe the exact moment a token expires and create a boost
     # with 10_000 or some percentage of their boost, which is perfectly fine.
@@ -720,10 +713,10 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
     assert y > 0  # dev: no boost
     assert y >= tvalue  # dev: cannot reduce value of boost
 
-    bias, slope = self._calc_bias_slope(time, y, convert(expire_time, int256))
-    assert slope < 0  # dev: invalid slope
+    point = self._calc_bias_slope(time, y, convert(expire_time, int256))
+    assert point.slope < 0  # dev: invalid slope
 
-    self._mint_boost(_token_id, delegator, receiver, bias, slope, _cancel_time, expire_time)
+    self._mint_boost(_token_id, delegator, receiver, point.bias, point.slope, _cancel_time, expire_time)
 
     # increase the number of expiries for the user
     if expire_time < next_expiry:
@@ -825,21 +818,17 @@ def adjusted_balance_of(_account: address) -> uint256:
     time: int256 = convert(block.timestamp, int256)
 
     if boost.delegated != 0:
-        dslope: int256 = 0
-        dbias: int256 = 0
-        dbias, dslope = self._deconstruct_bias_slope(boost.delegated)
+        dpoint: Point = self._deconstruct_bias_slope(boost.delegated)
 
         # we take the absolute value, since delegated boost can be negative
         # if any outstanding negative boosts are in circulation
         # this can inflate the vecrv balance of a user
         # taking the absolute value has the effect that it costs
         # a user to negatively impact another's vecrv balance
-        adjusted_balance -= abs(dslope * time + dbias)
+        adjusted_balance -= abs(dpoint.slope * time + dpoint.bias)
 
     if boost.received != 0:
-        rslope: int256 = 0
-        rbias: int256 = 0
-        rbias, rslope = self._deconstruct_bias_slope(boost.received)
+        rpoint: Point = self._deconstruct_bias_slope(boost.received)
 
         # similar to delegated boost, our received boost can be negative
         # if any outstanding negative boosts are in our possession
@@ -847,7 +836,7 @@ def adjusted_balance_of(_account: address) -> uint256:
         # our adjusted balance due to negative boosts. Instead we take
         # whichever is greater between 0 and the value of our received
         # boosts.
-        adjusted_balance += max(rslope * time + rbias, empty(int256))
+        adjusted_balance += max(rpoint.slope * time + rpoint.bias, empty(int256))
 
     # since we took the absolute value of our delegated boost, it now instead of
     # becoming negative is positive, and will continue to increase ...
@@ -869,11 +858,9 @@ def delegated_boost(_account: address) -> uint256:
         value boosts.
     @param _account The account to query
     """
-    dslope: int256 = 0
-    dbias: int256 = 0
-    dbias, dslope = self._deconstruct_bias_slope(self.boost[_account].delegated)
+    dpoint: Point = self._deconstruct_bias_slope(self.boost[_account].delegated)
     time: int256 = convert(block.timestamp, int256)
-    return convert(abs(dslope * time + dbias), uint256)
+    return convert(abs(dpoint.slope * time + dpoint.bias), uint256)
 
 
 @view
@@ -885,11 +872,9 @@ def received_boost(_account: address) -> uint256:
         if the account has any outstanding negative value boosts.
     @param _account The account to query
     """
-    rslope: int256 = 0
-    rbias: int256 = 0
-    rbias, rslope = self._deconstruct_bias_slope(self.boost[_account].received)
+    rpoint: Point = self._deconstruct_bias_slope(self.boost[_account].received)
     time: int256 = convert(block.timestamp, int256)
-    return convert(max(rslope * time + rbias, empty(int256)), uint256)
+    return convert(max(rpoint.slope * time + rpoint.bias, empty(int256)), uint256)
 
 
 @view
@@ -901,11 +886,9 @@ def token_boost(_token_id: uint256) -> int256:
         date.
     @param _token_id The token id to query
     """
-    tslope: int256 = 0
-    tbias: int256 = 0
-    tbias, tslope = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
+    tpoint: Point = self._deconstruct_bias_slope(self.boost_tokens[_token_id].data)
     time: int256 = convert(block.timestamp, int256)
-    return tslope * time + tbias
+    return tpoint.slope * time + tpoint.bias
 
 
 @view
@@ -970,11 +953,9 @@ def calc_boost_bias_slope(
         # only if it is the delegator's and it is within the bounds of existence
         ddata -= self.boost_tokens[_extend_token_id].data
 
-    dbias: int256 = 0
-    dslope: int256 = 0
-    dbias, dslope = self._deconstruct_bias_slope(ddata)
+    dpoint: Point = self._deconstruct_bias_slope(ddata)
 
-    delegated_boost: int256 = dslope * time + dbias
+    delegated_boost: int256 = dpoint.slope * time + dpoint.bias
     assert delegated_boost >= 0  # dev: outstanding negative boosts
 
     y: int256 = _percentage * (VotingEscrow(VOTING_ESCROW).balanceOf(_delegator) - delegated_boost) / MAX_PCT

@@ -288,12 +288,14 @@ def _mint_boost(_token_id: uint256, _delegator: address, _receiver: address, _bi
 
 @internal
 def _burn_boost(_token_id: uint256, _delegator: address, _receiver: address, _bias: int256, _slope: int256):
-    data: uint256 = shift(convert(_bias, uint256), 128) + convert(abs(_slope), uint256)
-    self.boost[_delegator].delegated -= data
-    self.boost[_receiver].received -= data
-
     token: Token = self.boost_tokens[_token_id]
     expire_time: uint256 = token.expire_time
+
+    if expire_time == 0:
+        return
+
+    self.boost[_delegator].delegated -= token.data
+    self.boost[_receiver].received -= token.data
 
     token.data = 0
     # maintain the same position in the delegator array, but remove the cancel time

@@ -37,7 +37,7 @@ In fact, if an account does not participate in delegating veBoost, their adjuste
 ### Deployments
 
 
-- [VotingEscrowDelegation.vy](contracts/VotingEscrowDelegation.vy): [0xc620aaFD6Caa3Cb7566e54176dD2ED1A81d05655](https://etherscan.io/address/0xc620aaFD6Caa3Cb7566e54176dD2ED1A81d05655)
+- [VotingEscrowDelegation.vy](contracts/VotingEscrowDelegation.vy): [0xd30DD0B919cB4012b3AdD78f6Dcb6eb7ef225Ac8](https://etherscan.io/address/0xd30DD0B919cB4012b3AdD78f6Dcb6eb7ef225Ac8)
 - [DelegationProxy.vy](contracts/DelegationProxy.vy): [0x8E0c00ed546602fD9927DF742bbAbF726D5B0d16](https://etherscan.io/address/0x8E0c00ed546602fD9927DF742bbAbF726D5B0d16)
 
 

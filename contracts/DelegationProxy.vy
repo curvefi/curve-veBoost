@@ -1,4 +1,4 @@
-# @version 0.2.15
+# @version 0.2.8
 """
 @title Voting Escrow Delegation Proxy
 @author Curve Finance
@@ -23,11 +23,8 @@ event ApplyAdmins:
 event DelegationSet:
     delegation: address
 
-
-VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
-
-
 delegation: public(address)
+voting_escrow: public(address)
 
 emergency_admin: public(address)
 ownership_admin: public(address)
@@ -36,8 +33,9 @@ future_ownership_admin: public(address)
 
 
 @external
-def __init__(_delegation: address, _o_admin: address, _e_admin: address):
+def __init__(_delegation: address, _voting_escrow: address, _o_admin: address, _e_admin: address):
     self.delegation = _delegation
+    self.voting_escrow = _voting_escrow
 
     self.ownership_admin = _o_admin
     self.emergency_admin = _e_admin
@@ -55,7 +53,7 @@ def adjusted_balance_of(_account: address) -> uint256:
     """
     _delegation: address = self.delegation
     if _delegation == ZERO_ADDRESS:
-        return ERC20(VOTING_ESCROW).balanceOf(_account)
+        return ERC20(self.voting_escrow).balanceOf(_account)
     return VeDelegation(_delegation).adjusted_balance_of(_account)
 
 

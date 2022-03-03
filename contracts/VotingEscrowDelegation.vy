@@ -552,25 +552,6 @@ def burn(_token_id: uint256):
     self._burn(_token_id)
 
 
-#@ if mode == "test":
-@external
-def _mint_for_testing(_to: address, _token_id: uint256):
-    self._mint(_to, _token_id)
-
-
-@external
-def _burn_for_testing(_token_id: uint256):
-    self._burn(_token_id)
-
-
-@view
-@external
-def uint_to_string(_value: uint256) -> String[78]:
-    return self._uint_to_string(_value)
-
-#@ endif
-
-
 @external
 def create_boost(
     _delegator: address,

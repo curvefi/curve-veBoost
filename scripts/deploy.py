@@ -2,12 +2,12 @@ from brownie import VotingEscrowDelegation, accounts
 
 
 def main():
-    DEPLOYER = accounts.load("dev")
+    DEPLOYER = accounts.load("veOracle-deployer")
     VotingEscrowDelegation.deploy(
         "Voting Escrow Boost Delegation",
         "veBoost",
         "",
-        {"from": DEPLOYER, "priority_fee": "2 gwei"},
+        {"from": DEPLOYER},
     )
     with open("etherscan_source_verification.vy", "w") as f:
         # we use jinja in the file, but the deployed source will

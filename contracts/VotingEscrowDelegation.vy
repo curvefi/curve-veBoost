@@ -1,4 +1,4 @@
-# @version 0.2.15
+# @version 0.3.1
 """
 @title Voting Escrow Delegation
 @author Curve Finance
@@ -91,7 +91,7 @@ struct Point:
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
 WEEK: constant(uint256) = 86400 * 7
-VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
+VOTING_ESCROW: constant(address) = 0x12F407340697Ae0b177546E535b91A5be021fBF9
 
 
 balanceOf: public(HashMap[address, uint256])

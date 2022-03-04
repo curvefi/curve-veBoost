@@ -9,7 +9,7 @@ interface veBoost:
     def adjusted_balance_of(_user: address) -> uint256: view
 
 
-VE_BOOST: constant(address) = ZERO_ADDRESS
+VE_BOOST: constant(address) = 0x8664742f18F94065Ed02F39A56bc55750dcc9e56
 VE_ORACLE: constant(address) = 0x12F407340697Ae0b177546E535b91A5be021fBF9
 
 

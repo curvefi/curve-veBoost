@@ -372,7 +372,7 @@ virtualenv==20.7.2
     # via pre-commit
 vvm==0.1.0
     # via eth-brownie
-vyper==0.3.1
+vyper==0.2.15
     # via eth-brownie
 wcwidth==0.2.5
     # via

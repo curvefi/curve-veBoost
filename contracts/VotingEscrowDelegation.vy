@@ -15,7 +15,7 @@ interface ERC721Receiver:
 
 interface VotingEscrow:
     def balanceOf(_account: address) -> int256: view
-    def locked__end(_addr: address) -> uint256: view
+    def locked(_addr: address) -> (int128, uint256): view
 
 
 event Approval:
@@ -594,7 +594,7 @@ def create_boost(
     assert _cancel_time <= expire_time  # dev: cancel time is after expiry
 
     assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast WEEK
-    assert expire_time <= VotingEscrow(VOTING_ESCROW).locked__end(_delegator)  # dev: boost expiration is past voting escrow lock expiry
+    assert expire_time <= VotingEscrow(VOTING_ESCROW).locked(_delegator)[1]  # dev: boost expiration is past voting escrow lock expiry
     assert _id < 2 ** 96  # dev: id out of bounds
 
     # [delegator address 160][cancel_time uint40][id uint56]
@@ -659,7 +659,7 @@ def extend_boost(_token_id: uint256, _percentage: int256, _expire_time: uint256,
 
     assert _cancel_time <= expire_time  # dev: cancel time is after expiry
     assert expire_time >= block.timestamp + WEEK  # dev: boost duration must be atleast one day
-    assert expire_time <= VotingEscrow(VOTING_ESCROW).locked__end(delegator) # dev: boost expiration is past voting escrow lock expiry
+    assert expire_time <= VotingEscrow(VOTING_ESCROW).locked(delegator)[1] # dev: boost expiration is past voting escrow lock expiry
 
     point: Point = self._deconstruct_bias_slope(token.data)
 
@@ -928,7 +928,7 @@ def calc_boost_bias_slope(
     assert _percentage <= MAX_PCT  # dev: percentage must be less than or equal to 100%
     assert _expire_time > time + WEEK  # dev: Invalid min expiry time
 
-    lock_expiry: int256 = convert(VotingEscrow(VOTING_ESCROW).locked__end(_delegator), int256)
+    lock_expiry: int256 = convert(VotingEscrow(VOTING_ESCROW).locked(_delegator)[1], int256)
     assert _expire_time <= lock_expiry
 
     ddata: uint256 = self.boost[_delegator].delegated

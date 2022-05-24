@@ -31,7 +31,7 @@ class StateMachine:
             self.crv.transfer(acct, dividend, {"from": self.alice})
 
         for acct in self.accounts:
-            self.crv.approve(self.vecrv, 2 ** 256 - 1, {"from": acct})
+            self.crv.approve(self.vecrv, 2**256 - 1, {"from": acct})
             self.vecrv.create_lock(dividend, chain.time() + 86400 * 365, {"from": acct})
 
     def rule_mint(self, st_addr, st_id):

@@ -26,6 +26,32 @@ def test_extend_an_existing_boost_modify_(
     assert veboost.token_cancel_time(token) == cancel_time + cancel_delta
 
 
+def test_extend_new_boost_after_previous_boost_expires(
+    alice, charlie, chain, veboost, alice_unlock_time
+):
+
+    token = veboost.get_token_id(alice, 0)
+    token_expiry = veboost.token_expiry(token)
+
+    # fast forward to a bit before when the boost expires
+    chain.mine(timestamp=token_expiry - DAY)
+
+    # give charlie 10% of alice's vecrv boost
+    charlie_expiration = alice_unlock_time - 20 * WEEK
+    assert charlie_expiration != token_expiry  # we want a new expiration time
+    veboost.create_boost(alice, charlie, 1_000, 0, charlie_expiration, 1, {"from": alice})
+
+    # now go to first expiry
+    chain.mine(timestamp=token_expiry + 1)
+    assert veboost.token_boost(token) < 0  # in principle this should become negative
+    veboost.cancel_boost(token, {"from": alice})  # anyone can cancel boost position if negative
+
+    # extend charlie's boost, now that bob's boost has expired
+    token = veboost.get_token_id(alice, 1)
+    new_expiry = alice_unlock_time - 18 * WEEK
+    veboost.extend_boost(token, 2_000, new_expiry, new_expiry - 1, {"from": alice})
+
+
 def test_delegator_operator_can_extend_a_boost(alice, bob, expire_time, veboost, cancel_time):
     veboost.setApprovalForAll(bob, True, {"from": alice})
 
@@ -33,7 +59,7 @@ def test_delegator_operator_can_extend_a_boost(alice, bob, expire_time, veboost,
     original_boost_value = veboost.token_boost(token)
     veboost.extend_boost(token, 7_500, expire_time + WEEK, cancel_time + 1, {"from": alice})
 
-    assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5, rel_tol=10 ** -6)
+    assert math.isclose(veboost.token_boost(token), original_boost_value * 1.5, rel_tol=10**-6)
     assert veboost.token_expiry(token) == expire_time + WEEK
     assert veboost.token_cancel_time(token) == cancel_time + 1
 

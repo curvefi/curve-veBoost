@@ -8,17 +8,17 @@ def uint_to_string(value: int) -> str:
         return "0"
 
     buffer = ""
-    max_len = len(str(2 ** 256 - 1))
+    max_len = len(str(2**256 - 1))
     digits = 0
     for i in range(1, max_len + 1):
-        if value // 10 ** i == 0:
+        if value // 10**i == 0:
             digits = i
             break
 
     # go backwards from end to start
     for i in range(max_len - 1, -1, -1):
         # get rid of everything below, then everything above
-        buffer += chr(((value // 10 ** i) % 10) + 48)
+        buffer += chr(((value // 10**i) % 10) + 48)
 
     return buffer[-digits:]
 

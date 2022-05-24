@@ -32,6 +32,31 @@ def test_create_a_boost(alice, bob, chain, alice_unlock_time, veboost, vecrv):
     assert veboost.token_expiry(token_id) == (alice_unlock_time // WEEK) * WEEK
 
 
+def test_add_new_boost_after_first_boost_expires(
+    alice, charlie, dave, chain, alice_unlock_time, veboost
+):
+
+    token = veboost.get_token_id(alice, 0)
+    token_expiry = veboost.token_expiry(token)
+
+    # fast forward to a bit before when the boost expires
+    chain.mine(timestamp=token_expiry - DAY)
+
+    # give charlie 10% of alice's vecrv boost
+    charlie_expiration = alice_unlock_time - 20 * WEEK
+    assert charlie_expiration != token_expiry  # we want a new expiration time
+    veboost.create_boost(alice, charlie, 1_000, 0, charlie_expiration, 1, {"from": alice})
+
+    # now go to first expiry
+    chain.mine(timestamp=token_expiry + 1)
+    assert veboost.token_boost(token) < 0  # in principle this should become negative
+    veboost.cancel_boost(token, {"from": alice})  # anyone can cancel boost position if negative
+
+    # give dave a boost
+    dave_expiration = alice_unlock_time - 10 * WEEK
+    veboost.create_boost(alice, dave, 1_000, 0, dave_expiration, 2, {"from": alice})
+
+
 def test_create_a_boost_updates_delegator_enumeration(alice, bob, alice_unlock_time, veboost):
     veboost.create_boost(alice, bob, 10_000, 0, alice_unlock_time, 0, {"from": alice})
     token_id = convert.to_uint(alice.address) << 96
@@ -116,7 +141,7 @@ def test_implicit_token_existence_check(alice, alice_unlock_time, veboost):
 
 def test_id_out_of_bounds(alice, alice_unlock_time, veboost):
     with brownie.reverts(dev_revert_msg="dev: id out of bounds"):
-        veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 2 ** 96, {"from": alice})
+        veboost.create_boost(alice, alice, 10_000, 0, alice_unlock_time, 2**96, {"from": alice})
 
 
 def test_expire_time_after_lock_expiry_reverts(alice, vecrv, veboost):

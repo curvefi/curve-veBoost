@@ -43,7 +43,7 @@ def test_delegator_can_cancel_after_cancel_time_or_expiry(
             alice,
             bob,
             1_000,
-            alice_unlock_time - (WEEK * i ** 2),
+            alice_unlock_time - (WEEK * i**2),
             alice_unlock_time,
             i,
             {"from": alice},
@@ -83,7 +83,7 @@ def test_third_parties_can_only_cancel_past_expiry(
             bob,
             1_000,
             0,
-            alice_unlock_time - (WEEK * i ** 2),
+            alice_unlock_time - (WEEK * i**2),
             i,
             {"from": alice},
         )

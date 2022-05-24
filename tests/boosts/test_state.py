@@ -173,7 +173,7 @@ class ContractState:
         # cancel time before expire time, expire time before lock expiry
         assert cancel_time <= expire_time <= lock_expiry
         assert expire_time >= timestamp + WEEK  # expire time greater than min delegation time
-        assert _id < 2 ** 96  # id with bounds
+        assert _id < 2**96  # id with bounds
 
         assert all(
             [t(timestamp) >= 0 for t in self.boost_tokens.values() if t.delegator == delegator]
@@ -344,7 +344,7 @@ class StateMachine:
         amount = total_supply // len(self.accounts)
         for account in self.accounts:
             self.crv.transfer(account, amount, {"from": self.accounts[0]})
-            self.crv.approve(self.vecrv, 2 ** 256 - 1, {"from": account})
+            self.crv.approve(self.vecrv, 2**256 - 1, {"from": account})
             # lock up half of each accounts balance for 3 years
             self.vecrv.create_lock(amount, chain.time() + 3 * YEAR, {"from": account})
 

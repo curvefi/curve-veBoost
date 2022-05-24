@@ -6,7 +6,7 @@ WEEK = DAY * 7
 
 @pytest.fixture(scope="session")
 def alice_lock_value():
-    return 1_000_000 * 10 ** 18
+    return 1_000_000 * 10**18
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def alice_unlock_time(chain):
 
 @pytest.fixture(scope="session")
 def bob_lock_value():
-    return 500_000 * 10 ** 18
+    return 500_000 * 10**18
 
 
 @pytest.fixture

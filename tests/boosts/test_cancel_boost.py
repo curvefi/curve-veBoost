@@ -3,6 +3,9 @@ import itertools as it
 import brownie
 import pytest
 
+DAY = 86400
+WEEK = DAY * 7
+
 pytestmark = pytest.mark.usefixtures("boost_bob")
 
 
@@ -67,3 +70,20 @@ def test_cancel_non_existent_boost_reverts(alice, veboost):
 
     with brownie.reverts(dev_revert_msg="dev: token does not exist"):
         veboost.cancel_boost(veboost.get_token_id(alice, 10), {"from": alice})
+
+
+def test_cancel_boost_after_previous_expires(
+    alice, charlie, dave, chain, alice_unlock_time, veboost, cancel_time, expire_time
+):
+
+    veboost.create_boost(
+        alice, charlie, 1_000, cancel_time + WEEK, expire_time + WEEK, 1, {"from": alice}
+    )
+
+    token_bob = veboost.get_token_id(alice, 0)
+    token_bob_expiry = veboost.token_expiry(token_bob)
+
+    # go to bob's expiry
+    chain.mine(timestamp=token_bob_expiry + 1)
+    assert veboost.token_boost(token_bob) < 0  # in principle this should become negative
+    veboost.cancel_boost(token_bob, {"from": alice})  # anyone can cancel boost position if negative

@@ -6,7 +6,6 @@
 @dev Provides test functions only available in test mode (`brownie test`)
 """
 
-
 interface ERC721Receiver:
     def onERC721Received(
         _operator: address, _from: address, _token_id: uint256, _data: Bytes[4096]
@@ -91,7 +90,7 @@ struct Point:
 IDENTITY_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000004
 MAX_PCT: constant(uint256) = 10_000
 WEEK: constant(uint256) = 86400 * 7
-VOTING_ESCROW: constant(address) = 0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2
+VOTING_ESCROW: constant(address) = 0x19854C9A5fFa8116f48f984bDF946fB9CEa9B5f7
 
 
 balanceOf: public(HashMap[address, uint256])
@@ -132,12 +131,12 @@ grey_list: public(HashMap[address, HashMap[address, bool]])
 
 
 @external
-def __init__(_name: String[32], _symbol: String[32], _base_uri: String[128]):
+def __init__(_name: String[32], _symbol: String[32], _base_uri: String[128], _admin: address):
     self.name = _name
     self.symbol = _symbol
     self.base_uri = _base_uri
 
-    self.admin = msg.sender
+    self.admin = _admin
 
 
 @internal

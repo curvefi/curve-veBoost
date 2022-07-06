@@ -21,6 +21,7 @@ SYMBOL: constant(String[8]) = "veBoost"
 VERSION: constant(String[8]) = "v2.0.0"
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
+PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 
 DOMAIN_SEPARATOR: immutable(bytes32)
@@ -28,6 +29,7 @@ VE: immutable(address)
 
 
 allowance: public(HashMap[address, HashMap[address, uint256]])
+nonces: public(HashMap[address, uint256])
 
 
 @external
@@ -41,6 +43,29 @@ def approve(_spender: address, _value: uint256) -> bool:
     self.allowance[msg.sender][_spender] = _value
 
     log Approval(msg.sender, _spender, _value)
+    return True
+
+
+@external
+def permit(_owner: address, _spender: address, _value: uint256, _deadline: uint256, _v: uint8, _r: bytes32, _s: bytes32) -> bool:
+    assert _owner != ZERO_ADDRESS
+    assert block.timestamp <= _deadline
+
+    nonce: uint256 = self.nonces[_owner]
+    digest: bytes32 = keccak256(
+        concat(
+            b"\x19\x01",
+            DOMAIN_SEPARATOR,
+            keccak256(_abi_encode(PERMIT_TYPEHASH, _owner, _spender, _value, nonce, _deadline))
+        )
+    )
+
+    assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
+
+    self.allowance[_owner][_spender] = _value
+    self.nonces[_owner] = nonce + 1
+
+    log Approval(_owner, _spender, _value)
     return True
 
 

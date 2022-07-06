@@ -17,8 +17,7 @@ event Transfer:
 
 
 interface VotingEscrow:
-    def totalSupply(_ts: uint256) -> uint256: view
-    def totalSupplyAt(_block: uint256) -> uint256: view
+    def totalSupply() -> uint256: view
 
 
 NAME: constant(String[32]) = "Vote-Escrowed Boost"
@@ -94,14 +93,8 @@ def decreaseAllowance(_spender: address, _subtracted_value: uint256) -> bool:
 
 @view
 @external
-def totalSupply(_ts: uint256 = block.timestamp) -> uint256:
-    return VotingEscrow(VE).totalSupply(_ts)
-
-
-@view
-@external
-def totalSupplyAt(_block: uint256) -> uint256:
-    return VotingEscrow(VE).totalSupplyAt(_block)
+def totalSupply() -> uint256:
+    return VotingEscrow(VE).totalSupply()
 
 
 @pure

@@ -10,6 +10,11 @@ event Approval:
     _spender: indexed(address)
     _value: uint256
 
+event Transfer:
+    _from: indexed(address)
+    _to: indexed(address)
+    _value: uint256
+
 
 interface VotingEscrow:
     def totalSupply(_ts: uint256) -> uint256: view

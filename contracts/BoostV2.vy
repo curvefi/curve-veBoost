@@ -39,6 +39,24 @@ def approve(_spender: address, _value: uint256) -> bool:
     return True
 
 
+@external
+def increaseAllowance(_spender: address, _added_value: uint256) -> bool:
+    allowance: uint256 = self.allowance[msg.sender][_spender] + _added_value
+    self.allowance[msg.sender][_spender] = allowance
+
+    log Approval(msg.sender, _spender, allowance)
+    return True
+
+
+@external
+def decreaseAllowance(_spender: address, _subtracted_value: uint256) -> bool:
+    allowance: uint256 = self.allowance[msg.sender][_spender] - _subtracted_value
+    self.allowance[msg.sender][_spender] = allowance
+
+    log Approval(msg.sender, _spender, allowance)
+    return True
+
+
 @view
 @external
 def totalSupply(_ts: uint256 = block.timestamp) -> uint256:

@@ -18,8 +18,12 @@ interface VotingEscrow:
 
 NAME: constant(String[32]) = "Vote-Escrowed Boost"
 SYMBOL: constant(String[8]) = "veBoost"
+VERSION: constant(String[8]) = "v2.0.0"
+
+EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
 
 
+DOMAIN_SEPARATOR: immutable(bytes32)
 VE: immutable(address)
 
 
@@ -28,6 +32,7 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 
 @external
 def __init__(_ve: address):
+    DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self, block.prevhash))
     VE = _ve
 
 
@@ -85,3 +90,9 @@ def symbol() -> String[8]:
 @external
 def decimals() -> uint8:
     return 18
+
+
+@pure
+@external
+def DOMAIN_SEPARATOR() -> bytes32:
+    return DOMAIN_SEPARATOR

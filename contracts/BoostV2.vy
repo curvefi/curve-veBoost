@@ -5,6 +5,12 @@
 """
 
 
+event Approval:
+    _owner: indexed(address)
+    _spender: indexed(address)
+    _value: uint256
+
+
 interface VotingEscrow:
     def totalSupply(_ts: uint256) -> uint256: view
     def totalSupplyAt(_block: uint256) -> uint256: view
@@ -17,9 +23,20 @@ SYMBOL: constant(String[8]) = "veBoost"
 VE: immutable(address)
 
 
+allowance: public(HashMap[address, HashMap[address, uint256]])
+
+
 @external
 def __init__(_ve: address):
     VE = _ve
+
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+
+    log Approval(msg.sender, _spender, _value)
+    return True
 
 
 @view

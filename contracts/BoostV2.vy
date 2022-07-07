@@ -20,6 +20,12 @@ interface VotingEscrow:
     def totalSupply() -> uint256: view
 
 
+struct Point:
+    bias: int256
+    slope: int256
+    ts: uint256
+
+
 NAME: constant(String[32]) = "Vote-Escrowed Boost"
 SYMBOL: constant(String[8]) = "veBoost"
 VERSION: constant(String[8]) = "v2.0.0"
@@ -34,6 +40,14 @@ VE: immutable(address)
 
 allowance: public(HashMap[address, HashMap[address, uint256]])
 nonces: public(HashMap[address, uint256])
+
+delegated_epoch: public(HashMap[address, uint256])
+delegated_point_history: public(HashMap[address, Point[100000000000000000000000000000000]])
+delegated_slope_changes: public(HashMap[address, int256])
+
+received_epoch: public(HashMap[address, uint256])
+received_point_history: public(HashMap[address, Point[100000000000000000000000000000000]])
+received_slope_changes: public(HashMap[address, int256])
 
 
 @external

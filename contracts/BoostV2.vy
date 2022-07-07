@@ -60,6 +60,24 @@ def __init__(_ve: address):
 
 
 @external
+def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = msg.sender):
+    assert _to not in [_from, ZERO_ADDRESS]
+    assert _amount != 0
+    assert _endtime > block.timestamp
+    assert _endtime % WEEK == 0
+
+    assert _amount <= VotingEscrow(VE).balanceOf(_from)
+    assert _endtime <= VotingEscrow(VE).locked__end(_from)
+
+    # reduce approval if necessary
+    if _from != msg.sender:
+        allowance: uint256 = self.allowance[_from][msg.sender]
+        if allowance != MAX_UINT256:
+            self.allowance[_from][msg.sender] = allowance - _amount
+            log Approval(_from, msg.sender, allowance - _amount)
+
+
+@external
 def approve(_spender: address, _value: uint256) -> bool:
     self.allowance[msg.sender][_spender] = _value
 

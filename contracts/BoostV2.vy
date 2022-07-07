@@ -17,6 +17,7 @@ event Transfer:
 
 
 interface VotingEscrow:
+    def balanceOf(_user: address) -> uint256: view
     def totalSupply() -> uint256: view
 
 
@@ -33,6 +34,8 @@ VERSION: constant(String[8]) = "v2.0.0"
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
 PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
+WEEK: constant(uint256) = 86400 * 7
+
 
 DOMAIN_SEPARATOR: immutable(bytes32)
 VE: immutable(address)
@@ -43,11 +46,11 @@ nonces: public(HashMap[address, uint256])
 
 delegated_epoch: public(HashMap[address, uint256])
 delegated_point_history: public(HashMap[address, Point[100000000000000000000000000000000]])
-delegated_slope_changes: public(HashMap[address, int256])
+delegated_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 
 received_epoch: public(HashMap[address, uint256])
 received_point_history: public(HashMap[address, Point[100000000000000000000000000000000]])
-received_slope_changes: public(HashMap[address, int256])
+received_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 
 
 @external
@@ -103,6 +106,63 @@ def decreaseAllowance(_spender: address, _subtracted_value: uint256) -> bool:
 
     log Approval(msg.sender, _spender, allowance)
     return True
+
+
+@view
+@external
+def balanceOf(_user: address) -> uint256:
+    amount: uint256 = VotingEscrow(VE).balanceOf(_user)
+    epoch: uint256 = self.delegated_epoch[_user]
+    point: Point = empty(Point)
+    ts: uint256 = 0
+
+    # calculate delegated boost
+    if amount != 0 and epoch != 0:
+        point = self.delegated_point_history[_user][epoch]
+        ts = (point.ts / WEEK) * WEEK
+        for _ in range(255):
+            ts += WEEK
+
+            d_slope: int256 = 0
+            if ts > block.timestamp:
+                ts = block.timestamp
+            else:
+                d_slope = self.delegated_slope_changes[_user][ts]
+
+            point.bias -= point.slope * convert(ts - point.ts, int256)
+            if ts == block.timestamp:
+                break
+            point.slope -= d_slope
+            point.ts = ts
+
+        if point.bias > 0:
+            amount -= convert(point.bias, uint256)
+
+    # calculate received boost
+    epoch = self.received_epoch[_user]
+    if epoch != 0:
+        point = self.received_point_history[_user][epoch]
+        ts = (point.ts / WEEK) * WEEK
+
+        for _ in range(255):
+            ts += WEEK
+
+            d_slope: int256 = 0
+            if ts > block.timestamp:
+                ts = block.timestamp
+            else:
+                d_slope = self.received_slope_changes[_user][ts]
+
+            point.bias -= point.slope * convert(ts - point.ts, int256)
+            if ts == block.timestamp:
+                break
+            point.slope -= d_slope
+            point.ts = ts
+
+        if point.bias > 0:
+            amount += convert(point.bias, uint256)
+
+    return amount
 
 
 @view

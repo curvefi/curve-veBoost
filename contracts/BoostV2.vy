@@ -19,6 +19,7 @@ event Transfer:
 interface VotingEscrow:
     def balanceOf(_user: address) -> uint256: view
     def totalSupply() -> uint256: view
+    def locked__end(_user: address) -> uint256: view
 
 
 struct Point:
@@ -57,6 +58,47 @@ received_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 def __init__(_ve: address):
     DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self, block.prevhash))
     VE = _ve
+
+
+@view
+@internal
+def _read_bias(_user: address, _delegated: bool) -> uint256:
+    epoch: uint256 = 0
+    point: Point = Point({bias: 0, slope: 0, ts: block.timestamp})
+
+    if _delegated:
+        epoch = self.delegated_epoch[_user]
+        if epoch != 0:
+            point = self.delegated_point_history[_user][epoch]
+    else:
+        epoch = self.received_epoch[_user]
+        if epoch != 0:
+            point = self.received_point_history[_user][epoch]
+
+    if point.ts == block.timestamp:
+        return convert(point.bias, uint256)
+
+    ts: uint256 = (point.ts / WEEK) * WEEK
+    for _ in range(255):
+        ts += WEEK
+
+        dslope: int256 = 0
+        if block.timestamp < ts:
+            ts = block.timestamp
+        else:
+            if _delegated:
+                dslope = self.delegated_slope_changes[_user][ts]
+            else:
+                dslope = self.received_slope_changes[_user][ts]
+
+        point.bias -= point.slope * convert(ts - point.ts, int256)
+        point.slope -= dslope
+        point.ts = ts
+
+        if ts == block.timestamp:
+            break
+
+    return convert(point.bias, uint256)
 
 
 @external
@@ -129,64 +171,31 @@ def decreaseAllowance(_spender: address, _subtracted_value: uint256) -> bool:
 @view
 @external
 def balanceOf(_user: address) -> uint256:
-    amount: uint256 = VotingEscrow(VE).balanceOf(_user)
-    epoch: uint256 = self.delegated_epoch[_user]
-    point: Point = empty(Point)
-    ts: uint256 = 0
-
-    # calculate delegated boost
-    if amount != 0 and epoch != 0:
-        point = self.delegated_point_history[_user][epoch]
-        ts = (point.ts / WEEK) * WEEK
-        for _ in range(255):
-            ts += WEEK
-
-            d_slope: int256 = 0
-            if ts > block.timestamp:
-                ts = block.timestamp
-            else:
-                d_slope = self.delegated_slope_changes[_user][ts]
-
-            point.bias -= point.slope * convert(ts - point.ts, int256)
-            if ts == block.timestamp:
-                break
-            point.slope -= d_slope
-            point.ts = ts
-
-        if point.bias > 0:
-            amount -= convert(point.bias, uint256)
-
-    # calculate received boost
-    epoch = self.received_epoch[_user]
-    if epoch != 0:
-        point = self.received_point_history[_user][epoch]
-        ts = (point.ts / WEEK) * WEEK
-
-        for _ in range(255):
-            ts += WEEK
-
-            d_slope: int256 = 0
-            if ts > block.timestamp:
-                ts = block.timestamp
-            else:
-                d_slope = self.received_slope_changes[_user][ts]
-
-            point.bias -= point.slope * convert(ts - point.ts, int256)
-            if ts == block.timestamp:
-                break
-            point.slope -= d_slope
-            point.ts = ts
-
-        if point.bias > 0:
-            amount += convert(point.bias, uint256)
-
-    return amount
+    return VotingEscrow(VE).balanceOf(_user) - self._read_bias(_user, True) + self._read_bias(_user, False)
 
 
 @view
 @external
 def totalSupply() -> uint256:
     return VotingEscrow(VE).totalSupply()
+
+
+@view
+@external
+def delegated_balance(_user: address) -> uint256:
+    return self._read_bias(_user, True)
+
+
+@view
+@external
+def received_balance(_user: address) -> uint256:
+    return self._read_bias(_user, False)
+
+
+@view
+@external
+def delegable_balance(_user: address) -> uint256:
+    return VotingEscrow(VE).balanceOf(_user) - self._read_bias(_user, True)
 
 
 @pure

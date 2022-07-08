@@ -139,6 +139,10 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
 
     log Transfer(_from, _to, _amount)
 
+    # also checkpoint received and delegated
+    self.received[_from] = self._checkpoint_read(_from, False)
+    self.delegated[_to] = self._checkpoint_read(_to, True)
+
 
 @external
 def checkpoint_user(_user: address):

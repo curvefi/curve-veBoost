@@ -141,6 +141,12 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
 
 
 @external
+def checkpoint_user(_user: address):
+    self.delegated[_user] = self._checkpoint_read(_user, True)
+    self.received[_user] = self._checkpoint_read(_user, False)
+
+
+@external
 def approve(_spender: address, _value: uint256) -> bool:
     self.allowance[msg.sender][_spender] = _value
 

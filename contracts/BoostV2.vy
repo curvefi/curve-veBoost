@@ -45,12 +45,10 @@ VE: immutable(address)
 allowance: public(HashMap[address, HashMap[address, uint256]])
 nonces: public(HashMap[address, uint256])
 
-delegated_epoch: public(HashMap[address, uint256])
-delegated_point_history: public(HashMap[address, Point[100000000000000000000000000000000]])
+delegated: public(HashMap[address, Point])
 delegated_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 
-received_epoch: public(HashMap[address, uint256])
-received_point_history: public(HashMap[address, Point[100000000000000000000000000000000]])
+received: public(HashMap[address, Point])
 received_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 
 
@@ -62,21 +60,19 @@ def __init__(_ve: address):
 
 @view
 @internal
-def _read_bias(_user: address, _delegated: bool) -> uint256:
-    epoch: uint256 = 0
-    point: Point = Point({bias: 0, slope: 0, ts: block.timestamp})
+def _checkpoint_read(_user: address, _delegated: bool) -> Point:
+    point: Point = empty(Point)
 
     if _delegated:
-        epoch = self.delegated_epoch[_user]
-        if epoch != 0:
-            point = self.delegated_point_history[_user][epoch]
+        point = self.delegated[_user]
     else:
-        epoch = self.received_epoch[_user]
-        if epoch != 0:
-            point = self.received_point_history[_user][epoch]
+        point = self.received[_user]
+
+    if point.ts == 0:
+        point.ts = block.timestamp
 
     if point.ts == block.timestamp:
-        return convert(point.bias, uint256)
+        return point
 
     ts: uint256 = (point.ts / WEEK) * WEEK
     for _ in range(255):
@@ -98,7 +94,7 @@ def _read_bias(_user: address, _delegated: bool) -> uint256:
         if ts == block.timestamp:
             break
 
-    return convert(point.bias, uint256)
+    return point
 
 
 @external
@@ -107,8 +103,6 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
     assert _amount != 0
     assert _endtime > block.timestamp
     assert _endtime % WEEK == 0
-
-    assert _amount <= VotingEscrow(VE).balanceOf(_from)
     assert _endtime <= VotingEscrow(VE).locked__end(_from)
 
     # reduce approval if necessary
@@ -117,6 +111,33 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
         if allowance != MAX_UINT256:
             self.allowance[_from][msg.sender] = allowance - _amount
             log Approval(_from, msg.sender, allowance - _amount)
+
+    # checkpoint delegated point
+    point: Point = self._checkpoint_read(_from, True)
+    assert _amount <= VotingEscrow(VE).balanceOf(_from) - convert(point.bias, uint256)
+
+    # calculate slope and bias being added
+    slope: int256 = convert(_amount / (_endtime - block.timestamp), int256)
+    bias: int256 = slope * convert(_endtime, int256)
+
+    # update delegated point
+    point.bias += bias
+    point.slope += slope
+
+    # store updated values
+    self.delegated[_from] = point
+    self.delegated_slope_changes[_from][_endtime] += slope
+
+    # update received amount
+    point = self._checkpoint_read(_to, False)
+    point.bias += bias
+    point.slope += slope
+
+    # store updated values
+    self.received[_to] = point
+    self.received_slope_changes[_to][_endtime] += slope
+
+    log Transfer(_from, _to, _amount)
 
 
 @external
@@ -171,7 +192,10 @@ def decreaseAllowance(_spender: address, _subtracted_value: uint256) -> bool:
 @view
 @external
 def balanceOf(_user: address) -> uint256:
-    return VotingEscrow(VE).balanceOf(_user) - self._read_bias(_user, True) + self._read_bias(_user, False)
+    amount: uint256 = VotingEscrow(VE).balanceOf(_user)
+    amount -= convert(self._checkpoint_read(_user, True).bias, uint256)
+    amount += convert(self._checkpoint_read(_user, False).bias, uint256)
+    return amount
 
 
 @view
@@ -183,19 +207,19 @@ def totalSupply() -> uint256:
 @view
 @external
 def delegated_balance(_user: address) -> uint256:
-    return self._read_bias(_user, True)
+    return convert(self._checkpoint_read(_user, True).bias, uint256)
 
 
 @view
 @external
 def received_balance(_user: address) -> uint256:
-    return self._read_bias(_user, False)
+    return convert(self._checkpoint_read(_user, False).bias, uint256)
 
 
 @view
 @external
 def delegable_balance(_user: address) -> uint256:
-    return VotingEscrow(VE).balanceOf(_user) - self._read_bias(_user, True)
+    return VotingEscrow(VE).balanceOf(_user) - convert(self._checkpoint_read(_user, True).bias, uint256)
 
 
 @pure

@@ -24,6 +24,11 @@ def veboost(alice, VotingEscrowDelegation, vecrv):
     return NewVotingEscrowDelegation.deploy("Curve veCRV Boost", "veCRV-Boost", "", {"from": alice})
 
 
+@pytest.fixture(scope="session")
+def veboost2(alice, BoostV2, vecrv):
+    return BoostV2.deploy(vecrv, {"from": alice})
+
+
 @pytest.fixture(scope="session", autouse=True)
 def multicall(alice):
     return brownie.multicall.deploy({"from": alice})

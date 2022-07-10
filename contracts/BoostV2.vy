@@ -66,6 +66,8 @@ def __init__(_boost_v1: address, _ve: address):
     DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self, block.prevhash))
     VE = _ve
 
+    log Transfer(ZERO_ADDRESS, msg.sender, 0)
+
 
 @view
 @internal

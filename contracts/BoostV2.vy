@@ -71,15 +71,6 @@ def __init__(_boost_v1: address, _ve: address):
 
 @view
 @internal
-def _balance_of(_user: address) -> uint256:
-    amount: uint256 = VotingEscrow(VE).balanceOf(_user)
-    amount -= convert(self._checkpoint_read(_user, True).bias, uint256)
-    amount += convert(self._checkpoint_read(_user, False).bias, uint256)
-    return amount
-
-
-@view
-@internal
 def _checkpoint_read(_user: address, _delegated: bool) -> Point:
     point: Point = empty(Point)
 
@@ -115,6 +106,15 @@ def _checkpoint_read(_user: address, _delegated: bool) -> Point:
             break
 
     return point
+
+
+@view
+@internal
+def _balance_of(_user: address) -> uint256:
+    amount: uint256 = VotingEscrow(VE).balanceOf(_user)
+    amount -= convert(self._checkpoint_read(_user, True).bias, uint256)
+    amount += convert(self._checkpoint_read(_user, False).bias, uint256)
+    return amount
 
 
 @internal

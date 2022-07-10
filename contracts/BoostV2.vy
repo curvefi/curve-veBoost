@@ -16,6 +16,11 @@ event Transfer:
     _value: uint256
 
 
+interface BoostV1:
+    def ownerOf(_token_id: uint256) -> address: view
+    def token_boost(_token_id: uint256) -> int256: view
+    def token_expiry(_token_id: uint256) -> uint256: view
+
 interface VotingEscrow:
     def balanceOf(_user: address) -> uint256: view
     def totalSupply() -> uint256: view
@@ -38,6 +43,7 @@ PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spe
 WEEK: constant(uint256) = 86400 * 7
 
 
+BOOST_V1: immutable(address)
 DOMAIN_SEPARATOR: immutable(bytes32)
 VE: immutable(address)
 
@@ -51,9 +57,12 @@ delegated_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 received: public(HashMap[address, Point])
 received_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
 
+migrated: public(HashMap[uint256, bool])
+
 
 @external
-def __init__(_ve: address):
+def __init__(_boost_v1: address, _ve: address):
+    BOOST_V1 = _boost_v1
     DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self, block.prevhash))
     VE = _ve
 
@@ -156,6 +165,20 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
             log Approval(_from, msg.sender, allowance - _amount)
 
     self._boost(_from, _to, _amount, _endtime)
+
+
+@external
+def migrate(_token_id: uint256):
+    assert not self.migrated[_token_id]
+
+    self._boost(
+        convert(shift(_token_id, -96), address),  # from
+        BoostV1(BOOST_V1).ownerOf(_token_id),  # to
+        convert(BoostV1(BOOST_V1).token_boost(_token_id), uint256),  # amount
+        BoostV1(BOOST_V1).token_expiry(_token_id),  # expiry
+    )
+
+    self.migrated[_token_id] = True
 
 
 @external

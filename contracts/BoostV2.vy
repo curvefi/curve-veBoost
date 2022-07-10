@@ -106,20 +106,13 @@ def _checkpoint_read(_user: address, _delegated: bool) -> Point:
     return point
 
 
-@external
-def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = msg.sender):
+@internal
+def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
     assert _to not in [_from, ZERO_ADDRESS]
     assert _amount != 0
     assert _endtime > block.timestamp
     assert _endtime % WEEK == 0
     assert _endtime <= VotingEscrow(VE).locked__end(_from)
-
-    # reduce approval if necessary
-    if _from != msg.sender:
-        allowance: uint256 = self.allowance[_from][msg.sender]
-        if allowance != MAX_UINT256:
-            self.allowance[_from][msg.sender] = allowance - _amount
-            log Approval(_from, msg.sender, allowance - _amount)
 
     # checkpoint delegated point
     point: Point = self._checkpoint_read(_from, True)
@@ -151,6 +144,18 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
     # also checkpoint received and delegated
     self.received[_from] = self._checkpoint_read(_from, False)
     self.delegated[_to] = self._checkpoint_read(_to, True)
+
+
+@external
+def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = msg.sender):
+    # reduce approval if necessary
+    if _from != msg.sender:
+        allowance: uint256 = self.allowance[_from][msg.sender]
+        if allowance != MAX_UINT256:
+            self.allowance[_from][msg.sender] = allowance - _amount
+            log Approval(_from, msg.sender, allowance - _amount)
+
+    self._boost(_from, _to, _amount, _endtime)
 
 
 @external

@@ -1,5 +1,7 @@
 {
-  "scripts": {
-    "preinstall": "npm i -g ganache-cli@6.12.2"
+  "name": "curve-veboost",
+  "version": "1.0.0",
+  "devDependencies": {
+    "hardhat": "^2.10.0"
   }
 }

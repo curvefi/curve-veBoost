@@ -4,3 +4,8 @@ ethereum:
   default_network: local
   local:
     default_provider: hardhat
+
+dependencies:
+  - name: curve-dao
+    github: curvefi/curve-dao-contracts
+    version: 1.3.0

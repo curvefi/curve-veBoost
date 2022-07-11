@@ -1,7 +1,9 @@
+ape-alchemy
+ape-hardhat
+ape-vyper
 black
-eth-brownie
+eth-ape
 flake8
 isort
-Jinja2
 pip-tools
 pre-commit

@@ -294,5 +294,17 @@ def decimals() -> uint8:
 
 @pure
 @external
+def BOOST_V1() -> address:
+    return BOOST_V1
+
+
+@pure
+@external
 def DOMAIN_SEPARATOR() -> bytes32:
     return DOMAIN_SEPARATOR
+
+
+@pure
+@external
+def VE() -> address:
+    return VE

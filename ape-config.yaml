@@ -1,1 +1,6 @@
 name: curve-veboost
+
+ethereum:
+  default_network: local
+  local:
+    default_provider: hardhat

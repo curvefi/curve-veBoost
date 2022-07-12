@@ -1,5 +1,8 @@
 import pytest
 
+DAY = 86400
+WEEK = DAY * 7
+
 
 @pytest.fixture(scope="session")
 def ZERO_ADDRESS():
@@ -36,5 +39,12 @@ def ve(alice, crv, project):
 
 
 @pytest.fixture(scope="module")
-def veboost(alice, project, ve, ZERO_ADDRESS):
-    yield project.BoostV2.deploy(ZERO_ADDRESS, ve.address, sender=alice)
+def veboost_v1(alice, project, ve):
+    yield project.VotingEscrowDelegation.deploy(
+        "Vote-Escrowed Boost", "veBoost", "", ve, sender=alice
+    )
+
+
+@pytest.fixture(scope="module")
+def veboost(alice, project, ve, veboost_v1):
+    yield project.BoostV2.deploy(veboost_v1, ve, sender=alice)

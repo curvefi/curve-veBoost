@@ -22,6 +22,9 @@ event Boost:
     _slope: uint256
     _start: uint256
 
+event Migrate:
+    _token_id: indexed(uint256)
+
 
 interface BoostV1:
     def ownerOf(_token_id: uint256) -> address: view
@@ -234,6 +237,7 @@ def migrate(_token_id: uint256):
     )
 
     self.migrated[_token_id] = True
+    log Migrate(_token_id)
 
 
 @external

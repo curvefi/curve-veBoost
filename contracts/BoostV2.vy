@@ -28,8 +28,8 @@ interface VotingEscrow:
 
 
 struct Point:
-    bias: int256
-    slope: int256
+    bias: uint256
+    slope: uint256
     ts: uint256
 
 
@@ -52,10 +52,10 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 nonces: public(HashMap[address, uint256])
 
 delegated: public(HashMap[address, Point])
-delegated_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
+delegated_slope_changes: public(HashMap[address, HashMap[uint256, uint256]])
 
 received: public(HashMap[address, Point])
-received_slope_changes: public(HashMap[address, HashMap[uint256, int256]])
+received_slope_changes: public(HashMap[address, HashMap[uint256, uint256]])
 
 migrated: public(HashMap[uint256, bool])
 
@@ -89,7 +89,7 @@ def _checkpoint_read(_user: address, _delegated: bool) -> Point:
     for _ in range(255):
         ts += WEEK
 
-        dslope: int256 = 0
+        dslope: uint256 = 0
         if block.timestamp < ts:
             ts = block.timestamp
         else:
@@ -98,7 +98,7 @@ def _checkpoint_read(_user: address, _delegated: bool) -> Point:
             else:
                 dslope = self.received_slope_changes[_user][ts]
 
-        point.bias -= point.slope * convert(ts - point.ts, int256)
+        point.bias -= point.slope * (ts - point.ts)
         point.slope -= dslope
         point.ts = ts
 
@@ -112,8 +112,8 @@ def _checkpoint_read(_user: address, _delegated: bool) -> Point:
 @internal
 def _balance_of(_user: address) -> uint256:
     amount: uint256 = VotingEscrow(VE).balanceOf(_user)
-    amount -= convert(self._checkpoint_read(_user, True).bias, uint256)
-    amount += convert(self._checkpoint_read(_user, False).bias, uint256)
+    amount -= self._checkpoint_read(_user, True).bias
+    amount += self._checkpoint_read(_user, False).bias
     return amount
 
 
@@ -130,8 +130,8 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
     assert _amount <= VotingEscrow(VE).balanceOf(_from) - convert(point.bias, uint256)
 
     # calculate slope and bias being added
-    slope: int256 = convert(_amount / (_endtime - block.timestamp), int256)
-    bias: int256 = slope * convert(_endtime, int256)
+    slope: uint256 = _amount / (_endtime - block.timestamp)
+    bias: uint256 = slope * _endtime
 
     # update delegated point
     point.bias += bias
@@ -259,19 +259,19 @@ def totalSupply() -> uint256:
 @view
 @external
 def delegated_balance(_user: address) -> uint256:
-    return convert(self._checkpoint_read(_user, True).bias, uint256)
+    return self._checkpoint_read(_user, True).bias
 
 
 @view
 @external
 def received_balance(_user: address) -> uint256:
-    return convert(self._checkpoint_read(_user, False).bias, uint256)
+    return self._checkpoint_read(_user, False).bias
 
 
 @view
 @external
 def delegable_balance(_user: address) -> uint256:
-    return VotingEscrow(VE).balanceOf(_user) - convert(self._checkpoint_read(_user, True).bias, uint256)
+    return VotingEscrow(VE).balanceOf(_user) - self._checkpoint_read(_user, True).bias
 
 
 @pure

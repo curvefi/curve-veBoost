@@ -21,6 +21,14 @@ def test_boost(alice, bob, veboost, ve, lock_unlock_time):
     assert veboost.delegated_balance(alice) == veboost.received_balance(bob)
 
 
+def test_boost_via_approval(alice, bob, veboost, ve, lock_unlock_time):
+    veboost.approve(bob, 2**256 - 1, sender=alice)
+    veboost.boost(bob, AMOUNT, lock_unlock_time, alice, sender=bob)
+
+    assert veboost.balanceOf(alice) == ve.balanceOf(alice) - veboost.delegated_balance(alice)
+    assert veboost.delegated_balance(alice) == veboost.received_balance(bob)
+
+
 @pytest.mark.parametrize("idx", range(2))
 def test_boost_fails_with_invalid_target(alice, veboost, lock_unlock_time, ZERO_ADDRESS, idx):
     target = [alice, ZERO_ADDRESS][idx]

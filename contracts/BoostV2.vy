@@ -15,6 +15,13 @@ event Transfer:
     _to: indexed(address)
     _value: uint256
 
+event Boost:
+    _from: indexed(address)
+    _to: indexed(address)
+    _bias: uint256
+    _slope: uint256
+    _start: uint256
+
 
 interface BoostV1:
     def ownerOf(_token_id: uint256) -> address: view
@@ -196,6 +203,7 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
     self.received_slope_changes[_to][_endtime] += slope
 
     log Transfer(_from, _to, _amount)
+    log Boost(_from, _to, bias, slope, block.timestamp)
 
     # also checkpoint received and delegated
     self.received[_from] = self._checkpoint_write(_from, False)

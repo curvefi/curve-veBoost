@@ -108,6 +108,51 @@ def _checkpoint_read(_user: address, _delegated: bool) -> Point:
     return point
 
 
+@internal
+def _checkpoint_write(_user: address, _delegated: bool) -> Point:
+    point: Point = empty(Point)
+
+    if _delegated:
+        point = self.delegated[_user]
+    else:
+        point = self.received[_user]
+
+    if point.ts == 0:
+        point.ts = block.timestamp
+
+    if point.ts == block.timestamp:
+        return point
+
+    dbias: uint256 = 0
+    ts: uint256 = (point.ts / WEEK) * WEEK
+    for _ in range(255):
+        ts += WEEK
+
+        dslope: uint256 = 0
+        if block.timestamp < ts:
+            ts = block.timestamp
+        else:
+            if _delegated:
+                dslope = self.delegated_slope_changes[_user][ts]
+            else:
+                dslope = self.received_slope_changes[_user][ts]
+
+        amount: uint256 = point.slope * (ts - point.ts)
+
+        dbias += amount
+        point.bias -= amount
+        point.slope -= dslope
+        point.ts = ts
+
+        if ts == block.timestamp:
+            break
+
+    if _delegated == False and dbias != 0:  # received boost
+        log Transfer(_user, ZERO_ADDRESS, dbias)
+
+    return point
+
+
 @view
 @internal
 def _balance_of(_user: address) -> uint256:
@@ -126,8 +171,8 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
     assert _endtime <= VotingEscrow(VE).locked__end(_from)
 
     # checkpoint delegated point
-    point: Point = self._checkpoint_read(_from, True)
-    assert _amount <= VotingEscrow(VE).balanceOf(_from) - convert(point.bias, uint256)
+    point: Point = self._checkpoint_write(_from, True)
+    assert _amount <= VotingEscrow(VE).balanceOf(_from) - point.bias
 
     # calculate slope and bias being added
     slope: uint256 = _amount / (_endtime - block.timestamp)
@@ -142,7 +187,7 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
     self.delegated_slope_changes[_from][_endtime] += slope
 
     # update received amount
-    point = self._checkpoint_read(_to, False)
+    point = self._checkpoint_write(_to, False)
     point.bias += bias
     point.slope += slope
 
@@ -153,8 +198,8 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
     log Transfer(_from, _to, _amount)
 
     # also checkpoint received and delegated
-    self.received[_from] = self._checkpoint_read(_from, False)
-    self.delegated[_to] = self._checkpoint_read(_to, True)
+    self.received[_from] = self._checkpoint_write(_from, False)
+    self.delegated[_to] = self._checkpoint_write(_to, True)
 
 
 @external
@@ -185,8 +230,8 @@ def migrate(_token_id: uint256):
 
 @external
 def checkpoint_user(_user: address):
-    self.delegated[_user] = self._checkpoint_read(_user, True)
-    self.received[_user] = self._checkpoint_read(_user, False)
+    self.delegated[_user] = self._checkpoint_write(_user, True)
+    self.received[_user] = self._checkpoint_write(_user, False)
 
 
 @external

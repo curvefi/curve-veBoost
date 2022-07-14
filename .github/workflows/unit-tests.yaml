@@ -17,16 +17,14 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            ~/.solcx
             ~/.vvm
-            ~/.brownie
           key: compiler-cache
 
       - name: Setup Node.js
         uses: actions/setup-node@v1
 
       - name: Install Ganache
-        run: npm install
+        run: npm ci
 
       - name: Setup Python 3.8
         uses: actions/setup-python@v2
@@ -37,4 +35,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Tests
-        run: brownie test --stateful false
+        run: ape test

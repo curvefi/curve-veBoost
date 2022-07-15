@@ -22,8 +22,10 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v1
+        with:
+          node-version: 16
 
-      - name: Install Ganache
+      - name: Install Hardhat
         run: npm ci
 
       - name: Setup Python 3.8
@@ -36,3 +38,4 @@ jobs:
 
       - name: Run Tests
         run: ape test
+        timeout-minutes: 10

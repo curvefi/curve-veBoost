@@ -6,7 +6,7 @@ boosted reward power at a single address. For example, enabling smart contracts 
 ### Deployments
 
 
-- [BoostV2.vy](contracts/BoostV2.vy): [0x826da65023a52497538ba395EA5d91472898BD57](https://etherscan.io/address/0x826da65023a52497538ba395EA5d91472898BD57)
+- [BoostV2.vy](contracts/BoostV2.vy): [0xD0921691C7DEBc698e6e372c6f74dc01fc9d3778](https://etherscan.io/address/0xD0921691C7DEBc698e6e372c6f74dc01fc9d3778)
 - [DelegationProxy.vy](contracts/DelegationProxy.vy): [0x8E0c00ed546602fD9927DF742bbAbF726D5B0d16](https://etherscan.io/address/0x8E0c00ed546602fD9927DF742bbAbF726D5B0d16)
 
 

@@ -167,8 +167,12 @@ def _checkpoint_write(_user: address, _delegated: bool) -> Point:
 @internal
 def _balance_of(_user: address) -> uint256:
     amount: uint256 = VotingEscrow(VE).balanceOf(_user)
-    amount -= self._checkpoint_read(_user, True).bias
-    amount += self._checkpoint_read(_user, False).bias
+
+    point: Point = self._checkpoint_read(_user, True)
+    amount -= (point.bias - point.slope * block.timestamp)
+
+    point = self._checkpoint_read(_user, False)
+    amount += (point.bias - point.slope * block.timestamp)
     return amount
 
 
@@ -182,7 +186,7 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
 
     # checkpoint delegated point
     point: Point = self._checkpoint_write(_from, True)
-    assert _amount <= VotingEscrow(VE).balanceOf(_from) - point.bias
+    assert _amount <= VotingEscrow(VE).balanceOf(_from) - (point.bias - point.slope * block.timestamp)
 
     # calculate slope and bias being added
     slope: uint256 = _amount / (_endtime - block.timestamp)
@@ -316,19 +320,22 @@ def totalSupply() -> uint256:
 @view
 @external
 def delegated_balance(_user: address) -> uint256:
-    return self._checkpoint_read(_user, True).bias
+    point: Point = self._checkpoint_read(_user, True)
+    return point.bias - point.slope * block.timestamp
 
 
 @view
 @external
 def received_balance(_user: address) -> uint256:
-    return self._checkpoint_read(_user, False).bias
+    point: Point = self._checkpoint_read(_user, False)
+    return point.bias - point.slope * block.timestamp
 
 
 @view
 @external
 def delegable_balance(_user: address) -> uint256:
-    return VotingEscrow(VE).balanceOf(_user) - self._checkpoint_read(_user, True).bias
+    point: Point = self._checkpoint_read(_user, True)
+    return VotingEscrow(VE).balanceOf(_user) - (point.bias - point.slope * block.timestamp)
 
 
 @pure

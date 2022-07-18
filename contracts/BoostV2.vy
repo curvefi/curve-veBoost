@@ -169,10 +169,10 @@ def _balance_of(_user: address) -> uint256:
     amount: uint256 = VotingEscrow(VE).balanceOf(_user)
 
     point: Point = self._checkpoint_read(_user, True)
-    amount -= (point.bias - point.slope * block.timestamp)
+    amount -= (point.bias - point.slope * (block.timestamp - point.ts))
 
     point = self._checkpoint_read(_user, False)
-    amount += (point.bias - point.slope * block.timestamp)
+    amount += (point.bias - point.slope * (block.timestamp - point.ts))
     return amount
 
 
@@ -186,11 +186,11 @@ def _boost(_from: address, _to: address, _amount: uint256, _endtime: uint256):
 
     # checkpoint delegated point
     point: Point = self._checkpoint_write(_from, True)
-    assert _amount <= VotingEscrow(VE).balanceOf(_from) - (point.bias - point.slope * block.timestamp)
+    assert _amount <= VotingEscrow(VE).balanceOf(_from) - (point.bias - point.slope * (block.timestamp - point.ts))
 
     # calculate slope and bias being added
     slope: uint256 = _amount / (_endtime - block.timestamp)
-    bias: uint256 = slope * _endtime
+    bias: uint256 = slope * (_endtime - block.timestamp)
 
     # update delegated point
     point.bias += bias
@@ -321,21 +321,21 @@ def totalSupply() -> uint256:
 @external
 def delegated_balance(_user: address) -> uint256:
     point: Point = self._checkpoint_read(_user, True)
-    return point.bias - point.slope * block.timestamp
+    return point.bias - point.slope * (block.timestamp - point.ts)
 
 
 @view
 @external
 def received_balance(_user: address) -> uint256:
     point: Point = self._checkpoint_read(_user, False)
-    return point.bias - point.slope * block.timestamp
+    return point.bias - point.slope * (block.timestamp - point.ts)
 
 
 @view
 @external
 def delegable_balance(_user: address) -> uint256:
     point: Point = self._checkpoint_read(_user, True)
-    return VotingEscrow(VE).balanceOf(_user) - (point.bias - point.slope * block.timestamp)
+    return VotingEscrow(VE).balanceOf(_user) - (point.bias - point.slope * (block.timestamp - point.ts))
 
 
 @pure

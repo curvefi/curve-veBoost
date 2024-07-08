@@ -1,6 +1,6 @@
 # @version 0.3.10
 """
-@title Boost Delegation V2
+@title Boost Delegation V3
 @author CurveFi
 """
 
@@ -35,7 +35,7 @@ struct Point:
 
 NAME: constant(String[32]) = "Vote-Escrowed Boost"
 SYMBOL: constant(String[8]) = "veBoost"
-VERSION: constant(String[8]) = "v2.1.0"
+VERSION: constant(String[8]) = "v3.0.0"
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
 PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")

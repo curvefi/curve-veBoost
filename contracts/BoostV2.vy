@@ -294,7 +294,7 @@ def adjusted_balance_of_write(_user: address) -> uint256:
     amount += (point.bias - point.slope * (block.timestamp - point.ts))
 
     return amount
-    
+
 
 @view
 @external

@@ -1,11 +1,10 @@
-from ape import accounts, project
+from ape import accounts, project, Contract
 
-primary = accounts.load("primary")
+primary = accounts.load("wavey3")
 
 
-def main():
+def xmain():
     project.BoostV2.deploy(
-        "0xd30DD0B919cB4012b3AdD78f6Dcb6eb7ef225Ac8",
         "0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2",
         sender=primary,
     )

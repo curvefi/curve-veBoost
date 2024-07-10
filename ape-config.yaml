@@ -1,9 +1,9 @@
 name: curve-veboost
 
 ethereum:
-  default_network: local
+  default_network: mainnet-fork
   local:
-    default_provider: hardhat
+    default_provider: foundry
 
 dependencies:
   - name: curve-dao

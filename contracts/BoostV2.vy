@@ -1,9 +1,8 @@
-# @version 0.3.3
+# @version 0.3.10
 """
-@title Boost Delegation V2
+@title Boost Delegation V3
 @author CurveFi
 """
-
 
 event Approval:
     _owner: indexed(address)
@@ -22,15 +21,6 @@ event Boost:
     _slope: uint256
     _start: uint256
 
-event Migrate:
-    _token_id: indexed(uint256)
-
-
-interface BoostV1:
-    def ownerOf(_token_id: uint256) -> address: view
-    def token_boost(_token_id: uint256) -> int256: view
-    def token_expiry(_token_id: uint256) -> uint256: view
-
 interface VotingEscrow:
     def balanceOf(_user: address) -> uint256: view
     def totalSupply() -> uint256: view
@@ -45,7 +35,7 @@ struct Point:
 
 NAME: constant(String[32]) = "Vote-Escrowed Boost"
 SYMBOL: constant(String[8]) = "veBoost"
-VERSION: constant(String[8]) = "v2.0.0"
+VERSION: constant(String[8]) = "v3.0.0"
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
 PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
@@ -53,7 +43,6 @@ PERMIT_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spe
 WEEK: constant(uint256) = 86400 * 7
 
 
-BOOST_V1: immutable(address)
 DOMAIN_SEPARATOR: immutable(bytes32)
 VE: immutable(address)
 
@@ -67,12 +56,8 @@ delegated_slope_changes: public(HashMap[address, HashMap[uint256, uint256]])
 received: public(HashMap[address, Point])
 received_slope_changes: public(HashMap[address, HashMap[uint256, uint256]])
 
-migrated: public(HashMap[uint256, bool])
-
-
 @external
-def __init__(_boost_v1: address, _ve: address):
-    BOOST_V1 = _boost_v1
+def __init__(_ve: address):
     DOMAIN_SEPARATOR = keccak256(_abi_encode(EIP712_TYPEHASH, keccak256(NAME), keccak256(VERSION), chain.id, self, block.prevhash))
     VE = _ve
 
@@ -230,21 +215,6 @@ def boost(_to: address, _amount: uint256, _endtime: uint256, _from: address = ms
 
 
 @external
-def migrate(_token_id: uint256):
-    assert not self.migrated[_token_id]
-
-    self._boost(
-        convert(shift(_token_id, -96), address),  # from
-        BoostV1(BOOST_V1).ownerOf(_token_id),  # to
-        convert(BoostV1(BOOST_V1).token_boost(_token_id), uint256),  # amount
-        BoostV1(BOOST_V1).token_expiry(_token_id),  # expiry
-    )
-
-    self.migrated[_token_id] = True
-    log Migrate(_token_id)
-
-
-@external
 def checkpoint_user(_user: address):
     self.delegated[_user] = self._checkpoint_write(_user, True)
     self.received[_user] = self._checkpoint_write(_user, False)
@@ -311,6 +281,21 @@ def adjusted_balance_of(_user: address) -> uint256:
     return self._balance_of(_user)
 
 
+@external
+def adjusted_balance_of_write(_user: address) -> uint256:
+    amount: uint256 = VotingEscrow(VE).balanceOf(_user)
+
+    point: Point = self._checkpoint_write(_user, True)
+    self.delegated[_user] = point
+    amount -= (point.bias - point.slope * (block.timestamp - point.ts))
+
+    point = self._checkpoint_write(_user, False)
+    self.received[_user] = point
+    amount += (point.bias - point.slope * (block.timestamp - point.ts))
+
+    return amount
+
+
 @view
 @external
 def totalSupply() -> uint256:
@@ -354,12 +339,6 @@ def symbol() -> String[8]:
 @external
 def decimals() -> uint8:
     return 18
-
-
-@pure
-@external
-def BOOST_V1() -> address:
-    return BOOST_V1
 
 
 @pure

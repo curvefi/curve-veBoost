@@ -23,5 +23,5 @@ def veboost_v1(alice, project, ve):
 
 
 @pytest.fixture(scope="session")
-def veboost(alice, project, ve, veboost_v1):
-    yield project.BoostV2.deploy(veboost_v1, ve, sender=alice)
+def veboost(alice, project, ve):
+    yield project.BoostV2.deploy(ve, sender=alice)
